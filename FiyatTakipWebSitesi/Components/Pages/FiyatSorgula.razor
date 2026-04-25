@@ -1,0 +1,58 @@
+﻿@page "/fiyat-sorgula"
+@inject ScraperService Scraper
+@rendermode InteractiveServer
+
+<h3>🔍 Fiyat Takip</h3>
+
+<div class="mb-3">
+    <input @bind="productUrl"
+           placeholder="Hepsiburada ürün URL'si girin..."
+           class="form-control" />
+</div>
+
+<button @onclick="FiyatGetir"
+        class="btn btn-primary"
+        disabled="@isLoading">
+    @(isLoading ? "⏳ Yükleniyor..." : "Fiyat Getir")
+</button>
+
+@if (!string.IsNullOrEmpty(price))
+{
+    <div class="alert alert-success mt-3">
+        💰 Fiyat: <strong>@price</strong>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(hata))
+{
+    <div class="alert alert-danger mt-3">❌ @hata</div>
+}
+
+@code {
+    string productUrl = "";
+    string price = "";
+    string hata = "";
+    bool isLoading = false;
+
+    async Task FiyatGetir()
+    {
+        if (string.IsNullOrWhiteSpace(productUrl)) return;
+
+        isLoading = true;
+        price = "";
+        hata = "";
+
+        try
+        {
+            price = await Scraper.GetPriceAsync(productUrl);
+        }
+        catch (Exception ex)
+        {
+            hata = $"Hata: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

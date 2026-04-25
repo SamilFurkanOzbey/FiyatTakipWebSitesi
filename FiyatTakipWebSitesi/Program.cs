@@ -1,10 +1,13 @@
 using FiyatTakipWebSitesi.Components;
+using FiyatTakipWebSitesi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddScoped<ScraperService>(); // sadece bu yeter
 
 var app = builder.Build();
 
