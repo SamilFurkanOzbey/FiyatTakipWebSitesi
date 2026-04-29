@@ -1,3 +1,12 @@
+// =====================================================
+// Kullanici.cs
+// Bu model, sisteme kayıtlı kullanıcıları temsil eder.
+// Ad, soyad, e-posta ve hash’lenmiş şifre bilgilerini;
+// hesap durumunu (aktif/pasif, e-posta doğrulama);
+// bildirim tercihlerini (e-posta ve push) ve
+// kullanıcıya ait ürün/uyarı koleksiyonlarını saklar.
+// =====================================================
+
 namespace FiyatTakipWebSitesi.Models;
 
 public class Kullanici

@@ -1,3 +1,13 @@
+// =====================================================
+// KategoriService.cs
+// Bu servis, ürün kategorilerinin yönetimini sağlar.
+// Veritabanındaki kategorileri listeleme, ID ile getirme,
+// yeni kategori ekleme, güncelleme ve silme işlemlerini
+// asenkron olarak gerçekleştirir. Aynı zamanda uygulama
+// ilk çalıştığında varsayılan kategorileri
+// otomatik olarak seed eden bir metot da içerir.
+// =====================================================
+
 using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.Models;
 using Microsoft.EntityFrameworkCore;

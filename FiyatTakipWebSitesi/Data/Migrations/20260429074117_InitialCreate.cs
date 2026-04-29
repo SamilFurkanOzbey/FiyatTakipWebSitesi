@@ -1,4 +1,17 @@
-﻿using System;
+// =====================================================
+// 20260429074117_InitialCreate.cs
+// Bu dosya, Entity Framework Core tarafından üretilen
+// ilk veritabanı migration dosyasıdır. Çalıştırıldığında
+// SQL Server'da aşağıdaki tabloları oluşturur:
+//   - Kategoriler  : Ürün kategorileri
+//   - Kullanicilar : Sisteme kayıtlı kullanıcılar
+//   - Urunler      : Takip edilen ürünler (FK: Kategori, Kullanici)
+//   - FiyatGecmisleri : Her ürüne ait fiyat geçmişi (FK: Urun)
+//   - Uyarilar     : Fiyat uyarıları (FK: Urun, Kullanici)
+// Down() metodu ise bu tabloları sırayla kaldırır.
+// =====================================================
+
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

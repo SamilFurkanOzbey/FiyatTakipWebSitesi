@@ -1,3 +1,12 @@
+// =====================================================
+// Kategori.cs
+// Bu model, uygulamadaki ürün kategorilerini temsil eder.
+// Her kategorinin bir adı, açıklaması ve emoji ikonu vardır.
+// Bir kategoriye ait ürünler Urunler navigation
+// property’si üzerinden erişilebilir.
+// KategoriService tarafından yönetilir.
+// =====================================================
+
 namespace FiyatTakipWebSitesi.Models;
 
 public class Kategori

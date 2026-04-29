@@ -1,3 +1,13 @@
+// =====================================================
+// FiyatGecmisi.cs
+// Bu model, bir ürüne ait her fiyat değişikliğini
+// veritabanında ayrı bir kayıt olarak saklar.
+// Her kayıt; yeni fiyat, önceki fiyat, değişim miktarı
+// ve yüzdesi, stok durumu ile tarih bilgisini tutar.
+// FiyatGecmisiService tarafından okunur ve
+// UrunService.FiyatGuncelleAsync tarafından yazılır.
+// =====================================================
+
 namespace FiyatTakipWebSitesi.Models;
 
 public class FiyatGecmisi

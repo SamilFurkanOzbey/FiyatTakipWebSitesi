@@ -1,3 +1,13 @@
+// =====================================================
+// FiyatGecmisiService.cs
+// Bu servis, ürünlere ait fiyat geçmişi verilerini
+// veritabanından okumak ve analiz etmek için kullanılır.
+// Belirli bir ürünün tüm fiyat kayıtlarını, tarih
+// aralığına göre fiyatları, minimum/maksimum fiyatları,
+// son N güne ait ortalama fiyatı ve rekor düşük fiyat
+// kontrolünü asenkron olarak sunar.
+// =====================================================
+
 using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.Models;
 using Microsoft.EntityFrameworkCore;

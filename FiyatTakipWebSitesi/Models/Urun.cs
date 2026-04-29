@@ -1,3 +1,15 @@
+// =====================================================
+// Urun.cs
+// Bu model, kullanıcıların fiyat takibine eklediği
+// ürünleri temsil eder. Ürün adı, URL, görsel,
+// başlangıç/son fiyat, hedef fiyat ve bildirim
+// tercihlerini (düşüş/artış) saklar. Aynı zamanda
+// bağlı kategori, kullanıcı, fiyat geçmişi ve
+// uyarı koleksiyonlarına navigation property
+// üzerinden erişim sağlar. UrunService tarafından
+// yönetilir.
+// =====================================================
+
 namespace FiyatTakipWebSitesi.Models;
 
 public class Urun

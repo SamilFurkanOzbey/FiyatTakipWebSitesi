@@ -1,3 +1,13 @@
+// =====================================================
+// UrunService.cs
+// Bu servis, takip edilen ürünlerin veritabanı işlemlerini
+// yönetir. Tüm ürünleri, belirli bir ürünü, kategoriye
+// veya kullanıcıya göre ürünleri listeleme; yeni ürün ekleme
+// (başlangıç fiyat kaydı ile birlikte), fiyat güncelleme
+// (fiyat geçmişine otomatik kayıt atar), ürün bilgilerini
+// düzenleme ve soft-delete ile silme işlemlerini sağlar.
+// =====================================================
+
 using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.Models;
 using Microsoft.EntityFrameworkCore;
