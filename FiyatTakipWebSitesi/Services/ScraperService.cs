@@ -9,6 +9,7 @@
 
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using HtmlAgilityPack;
 
 namespace FiyatTakipWebSitesi.Services;
 
@@ -65,4 +66,79 @@ public class ScraperService
             return "Fiyat bulunamadı";
         });
     }
+
+    // Hepsiburada kategori sayfasından ürün listesi çeker
+    public Task<List<UrunKart>> GetKategoriUrunleriAsync(string kategoriUrl)
+    {
+        return Task.Run(() =>
+        {
+            var options = new ChromeOptions();
+            options.AddArgument("--headless=new");
+            options.AddArgument("--no-sandbox");
+            options.AddArgument("--disable-gpu");
+            options.AddArgument("--window-size=1920,1080");
+            options.AddArgument("--disable-blink-features=AutomationControlled");
+            options.AddExcludedArgument("enable-automation");
+            options.AddArgument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            using var driver = new ChromeDriver(options);
+            driver.Navigate().GoToUrl(kategoriUrl);
+            Thread.Sleep(4000);
+
+            var source = driver.PageSource;
+            var doc = new HtmlAgilityPack.HtmlDocument();
+            doc.LoadHtml(source);
+
+            var urunler = new List<UrunKart>();
+
+            // Hepsiburada ürün kartları
+            var kartlar = doc.DocumentNode.SelectNodes("//li[contains(@class,'productListContent-')]");
+
+            if (kartlar == null)
+            {
+                // Alternatif selector
+                kartlar = doc.DocumentNode.SelectNodes("//div[contains(@data-test-id,'product-card')]");
+            }
+
+            if (kartlar != null)
+            {
+                foreach (var kart in kartlar.Take(20))
+                {
+                    var adNode = kart.SelectSingleNode(".//*[contains(@class,'product-title') or contains(@data-test-id,'product-card-name') or contains(@class,'productName')]");
+                    var fiyatNode = kart.SelectSingleNode(".//*[contains(@class,'price-value') or contains(@data-test-id,'product-card-price') or contains(@class,'currentPrice')]");
+                    var resimNode = kart.SelectSingleNode(".//img");
+                    var linkNode = kart.SelectSingleNode(".//a[@href]");
+
+                    var ad = adNode?.InnerText?.Trim();
+                    var fiyat = fiyatNode?.InnerText?.Trim();
+                    var resim = resimNode?.GetAttributeValue("src", "") ?? resimNode?.GetAttributeValue("data-src", "");
+                    var link = linkNode?.GetAttributeValue("href", "");
+
+                    if (!string.IsNullOrWhiteSpace(ad) && !string.IsNullOrWhiteSpace(fiyat))
+                    {
+                        if (link != null && !link.StartsWith("http"))
+                            link = "https://www.hepsiburada.com" + link;
+
+                        urunler.Add(new UrunKart
+                        {
+                            Ad = ad,
+                            Fiyat = fiyat,
+                            ResimUrl = resim ?? "",
+                            UrunUrl = link ?? ""
+                        });
+                    }
+                }
+            }
+
+            return urunler;
+        });
+    }
+}
+
+public class UrunKart
+{
+    public string Ad { get; set; } = "";
+    public string Fiyat { get; set; } = "";
+    public string ResimUrl { get; set; } = "";
+    public string UrunUrl { get; set; } = "";
 }
