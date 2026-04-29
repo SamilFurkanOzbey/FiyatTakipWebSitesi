@@ -1,3 +1,12 @@
+// =====================================================
+// ApplicationDbContext.cs
+// Bu sınıf, Entity Framework Core kullanarak veritabanı
+// bağlantısını ve tablo yapılarını yöneten ana veritabanı
+// bağlam (context) sınıfıdır. Kullanıcılar, ürünler,
+// kategoriler, fiyat geçmişi ve uyarılar gibi tüm
+// veritabanı tablolarını ve aralarındaki ilişkileri burada tanımlar.
+// =====================================================
+
 using FiyatTakipWebSitesi.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -5,56 +14,65 @@ namespace FiyatTakipWebSitesi.Data;
 
 public class ApplicationDbContext : DbContext
 {
+    // Veritabanı bağlantı ayarlarını (connection string vb.) dışarıdan alır
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
 
+    // Veritabanındaki tabloları temsil eden DbSet'ler
     public DbSet<Kullanici> Kullanicilar { get; set; }
     public DbSet<Kategori> Kategoriler { get; set; }
     public DbSet<Urun> Urunler { get; set; }
     public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; }
     public DbSet<Uyari> Uyarilar { get; set; }
 
+    // Tablo ilişkilerini, kısıtlamaları ve index'leri burada yapılandırıyoruz
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Kategori - Urun ilişkisi
+        // Bir ürün yalnızca bir kategoriye ait olabilir.
+        // Kategori silinirse, bağlı ürünler de silinir (Cascade)
         modelBuilder.Entity<Urun>()
             .HasOne(u => u.Kategori)
             .WithMany(k => k.Urunler)
             .HasForeignKey(u => u.KategoriId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Kullanici - Urun ilişkisi
+        // Bir ürün yalnızca bir kullanıcıya ait olabilir.
+        // Kullanıcı silinirse, ürünün UserId alanı NULL yapılır (SetNull)
         modelBuilder.Entity<Urun>()
             .HasOne(u => u.Kullanici)
             .WithMany(k => k.Urunler)
             .HasForeignKey(u => u.UserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Urun - FiyatGecmisi ilişkisi
+        // Bir fiyat geçmişi kaydı yalnızca bir ürüne aittir.
+        // Ürün silinirse, o ürüne ait tüm fiyat geçmişi de silinir (Cascade)
         modelBuilder.Entity<FiyatGecmisi>()
             .HasOne(fg => fg.Urun)
             .WithMany(u => u.FiyatGecmisleri)
             .HasForeignKey(fg => fg.UrunId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Urun - Uyari ilişkisi
+        // Bir uyarı yalnızca bir ürüne aittir.
+        // Ürün silinirse, o ürüne ait tüm uyarılar da silinir (Cascade)
         modelBuilder.Entity<Uyari>()
             .HasOne(uy => uy.Urun)
             .WithMany(u => u.Uyarilar)
             .HasForeignKey(uy => uy.UrunId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Kullanici - Uyari ilişkisi
+        // Bir uyarı yalnızca bir kullanıcıya aittir.
+        // Kullanıcı silinirse, o kullanıcıya ait tüm uyarılar da silinir (Cascade)
         modelBuilder.Entity<Uyari>()
             .HasOne(uy => uy.Kullanici)
             .WithMany(k => k.Uyarilar)
             .HasForeignKey(uy => uy.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Decimal precision ayarları
+        // Para birimi alanları için hassasiyet ayarları:
+        // HasPrecision(10, 2) → toplam 10 basamak, virgülden sonra 2 basamak (örn: 99999999.99)
         modelBuilder.Entity<Urun>()
             .Property(u => u.BaslangicFiyati)
             .HasPrecision(10, 2);
@@ -79,19 +97,21 @@ public class ApplicationDbContext : DbContext
             .Property(fg => fg.FiyatDegisimi)
             .HasPrecision(10, 2);
 
+        // Yüzde değeri için daha dar hassasiyet: toplam 5 basamak, 2 ondalık (örn: 999.99)
         modelBuilder.Entity<FiyatGecmisi>()
             .Property(fg => fg.FiyatDegisimYüzdesi)
             .HasPrecision(5, 2);
 
-        // Unique constraints
+        // Aynı e-posta adresiyle iki kullanıcı kaydedilemez
         modelBuilder.Entity<Kullanici>()
             .HasIndex(k => k.Email)
             .IsUnique();
 
-        // Index'ler
+        // Fiyat geçmişinde tarihe göre hızlı sorgulama için index
         modelBuilder.Entity<FiyatGecmisi>()
             .HasIndex(fg => fg.Tarih);
 
+        // Uyarılarda oluşturulma tarihine göre hızlı sorgulama için index
         modelBuilder.Entity<Uyari>()
             .HasIndex(uy => uy.OlusturulmaTarihi);
     }

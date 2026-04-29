@@ -4,18 +4,30 @@
 
 <h3>🔍 Fiyat Takip</h3>
 
+@* =====================================================
+   FiyatSorgula.razor
+   Bu sayfa, kullanıcının girdiği Hepsiburada ürün URL'sini
+   kullanarak ilgili ürünün güncel fiyatını çeken bir
+   fiyat sorgulama aracıdır. Arka planda bir Scraper servisi
+   çalışarak sayfadan fiyat bilgisini otomatik olarak çeker.
+   ===================================================== *@
+
+@* Kullanıcının Hepsiburada ürün linkini gireceği metin kutusu *@
 <div class="mb-3">
     <input @bind="productUrl"
            placeholder="Hepsiburada ürün URL'si girin..."
            class="form-control" />
 </div>
 
+@* Fiyat sorgulama işlemini başlatan buton.
+   İşlem süresince buton devre dışı kalır ve "Yükleniyor..." yazar *@
 <button @onclick="FiyatGetir"
         class="btn btn-primary"
         disabled="@isLoading">
     @(isLoading ? "⏳ Yükleniyor..." : "Fiyat Getir")
 </button>
 
+@* Fiyat başarıyla alındıysa yeşil kutuda göster *@
 @if (!string.IsNullOrEmpty(price))
 {
     <div class="alert alert-success mt-3">
@@ -23,35 +35,42 @@
     </div>
 }
 
+@* Bir hata oluştuysa kırmızı kutuda hata mesajını göster *@
 @if (!string.IsNullOrEmpty(hata))
 {
     <div class="alert alert-danger mt-3">❌ @hata</div>
 }
 
 @code {
+    // Kullanıcının girdiği URL, fiyat sonucu ve hata mesajı için değişkenler
     string productUrl = "";
     string price = "";
     string hata = "";
-    bool isLoading = false;
+    bool isLoading = false; // Yükleme durumunu takip eder
 
     async Task FiyatGetir()
     {
+        // URL boşsa hiçbir şey yapma
         if (string.IsNullOrWhiteSpace(productUrl)) return;
 
+        // Yükleme başladı, önceki sonuçları temizle
         isLoading = true;
         price = "";
         hata = "";
 
         try
         {
+            // Scraper servisi ile URL'den fiyatı çek
             price = await Scraper.GetPriceAsync(productUrl);
         }
         catch (Exception ex)
         {
+            // Hata oluşursa mesajı kullanıcıya göster
             hata = $"Hata: {ex.Message}";
         }
         finally
         {
+            // İşlem bitince (başarılı ya da hatalı) yükleme durumunu kapat
             isLoading = false;
         }
     }
