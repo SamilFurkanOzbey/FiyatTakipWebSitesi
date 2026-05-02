@@ -42,7 +42,7 @@ public class FiyatSorgulaController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(FiyatSorgulaResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Sorgula([FromBody] FiyatSorgulaIstek istek)
+    public async Task<IActionResult> Sorgula([FromBody] FiyatSorgulaRequest istek)
     {
         if (string.IsNullOrWhiteSpace(istek.URL))
             return BadRequest(new { hata = "Geçerli bir URL gereklidir." });
@@ -123,14 +123,6 @@ public class FiyatSorgulaController : ControllerBase
         if (string.IsNullOrWhiteSpace(url))
             return BadRequest(new { hata = "Geçerli bir 'url' parametresi gereklidir." });
 
-        return await Sorgula(new FiyatSorgulaIstek { URL = url });
+        return await Sorgula(new FiyatSorgulaRequest { URL = url });
     }
-}
-
-/// <summary>Fiyat sorgulama isteği için model</summary>
-public class FiyatSorgulaIstek
-{
-    public string URL { get; set; } = string.Empty;
-    /// <summary>Dolu gelirse, çekilen fiyat bu ürünün veritabanı kaydına da yazılır</summary>
-    public int? UrunId { get; set; }
 }

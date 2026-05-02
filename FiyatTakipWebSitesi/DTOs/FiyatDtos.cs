@@ -27,6 +27,8 @@ public class FiyatGecmisiResponse
 public class FiyatSorgulaRequest
 {
     public string URL { get; set; } = string.Empty;
+    /// <summary>Dolu gelirse, çekilen fiyat bu ürünün veritabanı kaydına da yazılır</summary>
+    public int? UrunId { get; set; }
 }
 
 /// <summary>URL'den çekilen fiyat bilgisi yanıt modeli</summary>
