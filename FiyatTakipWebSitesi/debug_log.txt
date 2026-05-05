@@ -1,0 +1,2 @@
+SELECTOR: [data-test-id='price-current-price'] => '30.999,00 TL'
+TUTULAN SELECTOR: [data-test-id='price-current-price'] => '30.999,00 TL'

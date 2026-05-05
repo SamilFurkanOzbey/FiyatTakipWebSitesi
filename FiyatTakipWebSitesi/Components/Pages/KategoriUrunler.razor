@@ -1,24 +1,36 @@
-﻿@page "/kategoriler"
+﻿@* Bu sayfa /kategoriler route'unda çalışır *@
+@page "/kategoriler"
+
+@* ScraperService'i bu sayfaya inject ediyoruz — fiyat/ürün çekme işlemleri oradan gelir *@
 @inject ScraperService Scraper
+
+@* InteractiveServer: buton tıklama, liste güncelleme gibi olayların çalışması için gerekli *@
 @rendermode InteractiveServer
 
+@* Ana kapsayıcı — sol panel (kategoriler) ve sağ panel (ürünler) yan yana *@
 <div class="kategori-sayfa">
 
-    <!-- SOL: KATEGORİ PANELİ -->
+    @* ===== SOL PANEL: KATEGORİ LİSTESİ ===== *@
     <div class="kategori-panel">
         <h5 class="panel-baslik">📦 Kategoriler</h5>
+
+        @* Kategoriler listesindeki her öğeyi döngüyle ekrana bas *@
         @foreach (var kat in Kategoriler)
         {
+            @* Seçili kategori ise "aktif" class'ı ekle, değilse boş bırak *@
             <div class="kategori-item @(SecilenKategori?.Ad == kat.Ad ? "aktif" : "")"
                  @onclick="() => KategoriSec(kat)">
+                @* Tıklanınca KategoriSec metodunu çağır *@
                 <span class="kat-icon">@kat.Icon</span>
                 <span class="kat-ad">@kat.Ad</span>
             </div>
         }
     </div>
 
-    <!-- SAĞ: ÜRÜN PANELİ -->
+    @* ===== SAĞ PANEL: ÜRÜN GÖRÜNÜMÜ ===== *@
     <div class="urun-panel">
+
+        @* Henüz hiçbir kategori seçilmemişse yönlendirme mesajı göster *@
         @if (SecilenKategori == null)
         {
             <div class="bos-durum">
@@ -26,6 +38,8 @@
                 <p>Ürünleri görmek için bir kategori seçin</p>
             </div>
         }
+
+        @* Scraper arka planda çalışıyorsa dönen animasyon ve bilgi mesajı göster *@
         else if (isLoading)
         {
             <div class="yukleniyor">
@@ -33,10 +47,14 @@
                 <p>@SecilenKategori.Ad kategorisi yükleniyor...</p>
             </div>
         }
+
+        @* Scraper'dan hata döndüyse kırmızı uyarı kutusu göster *@
         else if (!string.IsNullOrEmpty(Hata))
         {
             <div class="alert alert-danger">❌ @Hata</div>
         }
+
+        @* Hata yok ama hiç ürün de bulunamadıysa boş durum mesajı göster *@
         else if (Urunler.Count == 0)
         {
             <div class="bos-durum">
@@ -44,15 +62,23 @@
                 <p>Bu kategoride ürün bulunamadı.</p>
             </div>
         }
+
+        @* Her şey yolundaysa ürünleri grid olarak listele *@
         else
         {
+            @* Kategori adı ve kaç ürün bulunduğunu gösteren başlık satırı *@
             <div class="urun-baslik-row">
                 <h5>🛍️ @SecilenKategori.Ad <span class="badge bg-secondary">@Urunler.Count ürün</span></h5>
             </div>
+
+            @* Ürün kartları grid düzeninde *@
             <div class="urun-grid">
                 @foreach (var urun in Urunler)
                 {
+                    @* Her kart tıklanabilir bir link — ürünün Hepsiburada sayfasını yeni sekmede açar *@
                     <a href="@urun.UrunUrl" target="_blank" class="urun-kart">
+
+                        @* Ürün resmi varsa göster, yoksa placeholder emoji koy *@
                         @if (!string.IsNullOrEmpty(urun.ResimUrl))
                         {
                             <img src="@urun.ResimUrl" alt="@urun.Ad" class="urun-resim" />
@@ -61,6 +87,8 @@
                         {
                             <div class="urun-resim-yok">🖼️</div>
                         }
+
+                        @* Ürün adı ve fiyatı alt kısımda *@
                         <div class="urun-bilgi">
                             <p class="urun-ad">@urun.Ad</p>
                             <p class="urun-fiyat">@urun.Fiyat</p>
@@ -73,14 +101,17 @@
 </div>
 
 <style>
+    /* Ana kapsayıcı: sol panel + sağ panel yan yana, sayfa yüksekliğini doldurur */
     .kategori-sayfa {
         display: flex;
-        height: calc(100vh - 80px);
+        height: calc(100vh - 80px); /* Navbar yüksekliği (80px) çıkarılır */
         gap: 0;
         font-family: 'Segoe UI', sans-serif;
     }
 
-    /* --- KATEGORİ PANELİ --- */
+    /* ===== KATEGORİ PANELİ ===== */
+
+    /* Sol panel: sabit genişlik, koyu arka plan, taşarsa kaydırma çubuğu */
     .kategori-panel {
         width: 200px;
         min-width: 200px;
@@ -90,6 +121,7 @@
         overflow-y: auto;
     }
 
+    /* "KATEGORİLER" başlık yazısı — küçük, soluk renk, büyük harf */
     .panel-baslik {
         color: #a0a0c0;
         font-size: 0.75rem;
@@ -100,6 +132,7 @@
         margin-bottom: 8px;
     }
 
+    /* Her kategori satırı: flex ile icon ve metin yan yana, hover animasyonu var */
     .kategori-item {
         display: flex;
         align-items: center;
@@ -108,25 +141,34 @@
         cursor: pointer;
         color: #c0c0d8;
         transition: background 0.15s, color 0.15s;
-        border-left: 3px solid transparent;
+        border-left: 3px solid transparent; /* Seçili değilken sol çizgi görünmez */
     }
 
-    .kategori-item:hover {
-        background: #2a2a4a;
-        color: #fff;
+        /* Üzerine gelinince hafif aydınlanır */
+        .kategori-item:hover {
+            background: #2a2a4a;
+            color: #fff;
+        }
+
+        /* Seçili kategori: mor sol çizgi ve vurgu rengi */
+        .kategori-item.aktif {
+            background: #2a2a4a;
+            color: #7c83fd;
+            border-left: 3px solid #7c83fd;
+            font-weight: 600;
+        }
+
+    .kat-icon {
+        font-size: 1.1rem;
     }
 
-    .kategori-item.aktif {
-        background: #2a2a4a;
-        color: #7c83fd;
-        border-left: 3px solid #7c83fd;
-        font-weight: 600;
+    .kat-ad {
+        font-size: 0.88rem;
     }
 
-    .kat-icon { font-size: 1.1rem; }
-    .kat-ad { font-size: 0.88rem; }
+    /* ===== ÜRÜN PANELİ ===== */
 
-    /* --- ÜRÜN PANELİ --- */
+    /* Sağ panel: kalan tüm genişliği kaplar, dikey kaydırma açık */
     .urun-panel {
         flex: 1;
         overflow-y: auto;
@@ -138,37 +180,41 @@
         margin-bottom: 16px;
     }
 
-    .urun-baslik-row h5 {
-        color: #e0e0f0;
-        font-size: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
+        .urun-baslik-row h5 {
+            color: #e0e0f0;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
+    /* Responsive grid: her kart en az 180px, sığdığı kadar yan yana dizilir */
     .urun-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: 16px;
     }
 
+    /* Ürün kartı: koyu arka plan, yuvarlatılmış köşe, hover'da yukarı kalkar */
     .urun-kart {
         background: #1a1a2e;
         border: 1px solid #2d2d4e;
         border-radius: 10px;
         overflow: hidden;
-        text-decoration: none;
+        text-decoration: none; /* Link altı çizgisini kaldır */
         color: inherit;
         transition: transform 0.15s, border-color 0.15s;
         display: flex;
         flex-direction: column;
     }
 
-    .urun-kart:hover {
-        transform: translateY(-3px);
-        border-color: #7c83fd;
-    }
+        /* Hover: kart 3px yukarı kalkar ve border moru olur */
+        .urun-kart:hover {
+            transform: translateY(-3px);
+            border-color: #7c83fd;
+        }
 
+    /* Ürün resmi: sabit yükseklik, içeriği orantılı sığdır, beyaz arka plan */
     .urun-resim {
         width: 100%;
         height: 150px;
@@ -177,6 +223,7 @@
         padding: 8px;
     }
 
+    /* Resim yoksa gösterilen placeholder kutu */
     .urun-resim-yok {
         width: 100%;
         height: 150px;
@@ -192,17 +239,19 @@
         flex: 1;
     }
 
+    /* Ürün adı: küçük font, soluk renk, max 2 satır — taşarsa "..." */
     .urun-ad {
         font-size: 0.78rem;
         color: #c0c0d8;
         margin: 0 0 6px;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: 2; /* Maksimum 2 satır göster */
         -webkit-box-orient: vertical;
         overflow: hidden;
         line-height: 1.4;
     }
 
+    /* Fiyat: büyük ve mor, kartın en dikkat çekici elemanı */
     .urun-fiyat {
         font-size: 0.95rem;
         font-weight: 700;
@@ -210,7 +259,9 @@
         margin: 0;
     }
 
-    /* --- DURUM EKRANLARI --- */
+    /* ===== DURUM EKRANLARI ===== */
+
+    /* Boş durum (kategori seçilmedi / ürün yok): ortaya hizalanmış mesaj */
     .bos-durum {
         display: flex;
         flex-direction: column;
@@ -222,8 +273,11 @@
         font-size: 0.95rem;
     }
 
-    .bos-durum span { font-size: 3rem; }
+        .bos-durum span {
+            font-size: 3rem;
+        }
 
+    /* Yükleniyor ekranı: spinner + metin ortada */
     .yukleniyor {
         display: flex;
         flex-direction: column;
@@ -234,62 +288,87 @@
         gap: 16px;
     }
 
+    /* CSS spinner: border'ın bir kenarı renkli, döndürülünce animasyon oluşur */
     .spinner {
         width: 40px;
         height: 40px;
-        border: 3px solid #2d2d4e;
-        border-top-color: #7c83fd;
+        border: 3px solid #2d2d4e; /* Soluk çerçeve */
+        border-top-color: #7c83fd; /* Sadece üst kenar renkli — dönüş hissi */
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
 
+    /* Spinner dönüş animasyonu */
     @@keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+            transform: rotate(360deg);
+        }
     }
 </style>
 
 @code {
-    // Sabit kategori listesi - istediğin kadar ekleyebilirsin
+    // -------------------------------------------------------
+    // Sabit kategori listesi.
+    // Yeni kategori eklemek için buraya satır ekle:
+    // new("Görünen Ad", "Emoji", "Hepsiburada URL'si")
+    // -------------------------------------------------------
     private List<KategoriItem> Kategoriler = new()
     {
-        new("Telefon",       "📱", "https://www.hepsiburada.com/cep-telefonlari-c-371965"),
-        new("Laptop",        "💻", "https://www.hepsiburada.com/laptop-notebook-c-2147483646"),
-        new("Tablet",        "📟", "https://www.hepsiburada.com/tablet-c-371990"),
-        new("Kulaklık",      "🎧", "https://www.hepsiburada.com/kulaklik-c-372009"),
-        new("Televizyon",    "📺", "https://www.hepsiburada.com/televizyon-c-372004"),
-        new("Buzdolabı",     "🧊", "https://www.hepsiburada.com/buzdolabi-c-371868"),
-        new("Çamaşır Makinesi", "🫧", "https://www.hepsiburada.com/camasir-makinesi-c-371866"),
-        new("Oyun Konsolu",  "🎮", "https://www.hepsiburada.com/oyun-konsolu-c-372012"),
-        new("Kamera",        "📷", "https://www.hepsiburada.com/fotograf-makinesi-c-372001"),
-        new("Aksesuar",      "🔌", "https://www.hepsiburada.com/telefon-aksesuar-c-372010"),
+        new("Telefon",          "📱", "https://www.hepsiburada.com/cep-telefonlari-c-371965"),
+        new("Laptop",           "💻", "https://www.hepsiburada.com/laptop-notebook-dizustu-bilgisayarlar-c-98"),
+        new("Tablet",           "📟", "https://www.hepsiburada.com/tabletler-c-368"),
+        new("Kulaklık",         "🎧", "https://www.hepsiburada.com/kulakliklar-c-405158"),
+        new("Televizyon",       "📺", "https://www.hepsiburada.com/televizyonlar-c-87"),
+        new("Buzdolabı",        "🧊", "https://www.hepsiburada.com/buzdolaplari-c-60"),
+        new("Çamaşır Makinesi", "🫧", "https://www.hepsiburada.com/camasir-makineleri-c-61"),
+        new("Oyun Konsolu",     "🎮", "https://www.hepsiburada.com/oyunlar-oyun-konsollari-c-2147483602"),
+        new("Kamera",           "📷", "https://www.hepsiburada.com/fotograf-makineleri-c-105"),
+        new("Aksesuar",         "🔌", "https://www.hepsiburada.com/tum-cep-telefonu-aksesuarlari-c-371966"),
     };
 
+    // Şu an seçili olan kategori — null ise hiçbiri seçilmemiş demek
     private KategoriItem? SecilenKategori;
+
+    // Scraper'dan gelen ürün listesi — her kategori seçiminde sıfırlanır
     private List<UrunKart> Urunler = new();
+
+    // Scraper arka planda çalışıyorken true — UI spinner gösterir
     private bool isLoading = false;
+
+    // Hata varsa mesaj buraya yazılır, yoksa boş kalır
     private string Hata = "";
 
+    // -------------------------------------------------------
+    // KategoriSec: Kullanıcı bir kategoriye tıkladığında çalışır.
+    // Eski ürünleri temizler, scraper'ı çalıştırır, sonuçları atar.
+    // -------------------------------------------------------
     private async Task KategoriSec(KategoriItem kat)
     {
+        // Zaten yükleme devam ediyorsa tekrar tetikleme
         if (isLoading) return;
-        SecilenKategori = kat;
-        Urunler.Clear();
-        Hata = "";
-        isLoading = true;
+
+        SecilenKategori = kat; // Seçili kategoriyi güncelle
+        Urunler.Clear();       // Önceki kategorinin ürünlerini temizle
+        Hata = "";             // Önceki hata mesajını temizle
+        isLoading = true;      // Spinner'ı göster
 
         try
         {
+            // ScraperService'ten kategori ürünlerini al (async — UI bloklanmaz)
             Urunler = await Scraper.GetKategoriUrunleriAsync(kat.Url);
         }
         catch (Exception ex)
         {
+            // Beklenmedik hata olursa (Chrome bulunamadı, timeout, vb.) mesajı göster
             Hata = $"Ürünler yüklenirken hata oluştu: {ex.Message}";
         }
         finally
         {
+            // Başarılı ya da hatalı, her durumda spinner'ı kapat
             isLoading = false;
         }
     }
 
+    // Her kategorinin taşıdığı 3 bilgi: görünen ad, emoji, Hepsiburada URL'si
     private record KategoriItem(string Ad, string Icon, string Url);
 }
