@@ -1,16 +1,36 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Support.UI;
 using HtmlAgilityPack;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class ScraperService
+public class ScraperService(ILogger<ScraperService> logger) : IDisposable
 {
-    private readonly ILogger<ScraperService> _logger;
+    private readonly ILogger<ScraperService> _logger = logger;
+    private ChromeDriver? _sharedDriver;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public ScraperService(ILogger<ScraperService> logger)
+    public void InitSharedDriver()
     {
-        _logger = logger;
+        _sharedDriver ??= new ChromeDriver(ChromeAyarlari());
+    }
+
+    public void CloseSharedDriver()
+    {
+        if (_sharedDriver != null)
+        {
+            _sharedDriver.Quit();
+            _sharedDriver.Dispose();
+            _sharedDriver = null;
+        }
+    }
+
+    public void Dispose()
+    {
+        CloseSharedDriver();
+        _semaphore.Dispose();
+        GC.SuppressFinalize(this);
     }
     private static ChromeOptions ChromeAyarlari()
     {
@@ -28,15 +48,14 @@ public class ScraperService
     // ─────────────────────────────────────────────────────────
     // Ana fiyatı çeken yardımcı metot
     // ─────────────────────────────────────────────────────────
-    private static string FiyatCek(IWebDriver driver)
+    private static string FiyatCek(ChromeDriver driver)
     {
         // 1. DENEME: data-test-id="default-price"
         var defaultPrice = driver.FindElements(By.CssSelector("[data-test-id='default-price']"));
         if (defaultPrice.Count > 0)
         {
             // "Kazancımı gör" kutusunu DOM'dan kaldır — fiyat metnine karışmasın
-            var jsExecutor = (IJavaScriptExecutor)driver;
-            jsExecutor.ExecuteScript(@"
+            driver.ExecuteScript(@"
                 var el = document.querySelector('[data-test-id=""see-earnings""]');
                 if (el) el.remove();
             ");
@@ -75,145 +94,227 @@ public class ScraperService
     // ─────────────────────────────────────────────────────────
     // 1) Sadece fiyat çeker — FiyatSorgula.razor tarafından kullanılıyor
     // ─────────────────────────────────────────────────────────
-    public Task<string> GetPriceAsync(string url)
+    public async Task<string> GetPriceAsync(string url)
     {
-        return Task.Run(() =>
+        await _semaphore.WaitAsync();
+        try
         {
-            using var driver = new ChromeDriver(ChromeAyarlari());
-            driver.Navigate().GoToUrl(url);
-            Thread.Sleep(5000);
+            return await Task.Run(() =>
+            {
+                bool useShared = _sharedDriver != null;
+                var driver = useShared ? _sharedDriver! : new ChromeDriver(ChromeAyarlari());
 
-            var fiyat = FiyatCek(driver);
-            _logger.LogDebug("[ScraperService] URL: {Url} | Fiyat: {Fiyat}", url, fiyat);
-            return fiyat;
-        });
+                try
+                {
+                    driver.Navigate().GoToUrl(url);
+                    
+                    var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                    try
+                    {
+                        wait.Until(d => d.FindElements(By.CssSelector("[data-test-id='default-price'], [data-test-id='price-current-price']")).Count > 0);
+                    }
+                    catch (WebDriverTimeoutException) { }
+
+                    var fiyat = FiyatCek(driver);
+                    if (_logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+                    {
+                        _logger.LogDebug("[ScraperService] URL: {Url} | Fiyat: {Fiyat}", url, fiyat);
+                    }
+                    return fiyat;
+                }
+                finally
+                {
+                    if (!useShared)
+                    {
+                        driver.Quit();
+                        driver.Dispose();
+                    }
+                }
+            });
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 
     // ─────────────────────────────────────────────────────────
     // 2) Kategori sayfasından ürün listesi çeker — KategoriUrunler.razor
     // ─────────────────────────────────────────────────────────
-    public Task<List<UrunKart>> GetKategoriUrunleriAsync(string kategoriUrl)
+    public async Task<List<UrunKart>> GetKategoriUrunleriAsync(string kategoriUrl)
     {
-        return Task.Run(() =>
+        await _semaphore.WaitAsync();
+        try
         {
-            using var driver = new ChromeDriver(ChromeAyarlari());
-            driver.Navigate().GoToUrl(kategoriUrl);
-            Thread.Sleep(4000);
-
-            string source;
-            try { source = driver.PageSource; }
-            catch { Thread.Sleep(2000); source = driver.PageSource; }
-
-            var doc = new HtmlAgilityPack.HtmlDocument();
-            doc.LoadHtml(source);
-
-            var urunler = new List<UrunKart>();
-
-            var kartlar = doc.DocumentNode.SelectNodes("//li[contains(@class,'productListContent-')]");
-            if (kartlar == null)
-                kartlar = doc.DocumentNode.SelectNodes("//div[contains(@data-test-id,'product-card')]");
-
-            if (kartlar != null)
+            return await Task.Run(() =>
             {
-                foreach (var kart in kartlar.Take(20))
+                bool useShared = _sharedDriver != null;
+                var driver = useShared ? _sharedDriver! : new ChromeDriver(ChromeAyarlari());
+
+                try
                 {
-                    var adNode = kart.SelectSingleNode(".//*[starts-with(@data-test-id,'title-')]");
-                    var fiyatNode = kart.SelectSingleNode(".//*[starts-with(@data-test-id,'final-price-')]");
-                    var resimNode = kart.SelectSingleNode(".//img");
-                    var linkNode = kart.SelectSingleNode(".//a[@href]");
-
-                    var ad = adNode?.InnerText?.Trim() ?? linkNode?.GetAttributeValue("title", "")?.Trim();
-                    var fiyat = fiyatNode?.InnerText?.Trim();
-                    var resim = resimNode?.GetAttributeValue("src", "");
-                    var link = linkNode?.GetAttributeValue("href", "");
-
-                    if (!string.IsNullOrWhiteSpace(ad) && !string.IsNullOrWhiteSpace(fiyat))
+                    driver.Navigate().GoToUrl(kategoriUrl);
+                    
+                    var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                    try
                     {
-                        if (link != null && !link.StartsWith("http"))
-                            link = "https://www.hepsiburada.com" + link;
+                        wait.Until(d => d.FindElements(By.CssSelector("li[class*='productListContent-'], div[data-test-id*='product-card']")).Count > 0);
+                    }
+                    catch (WebDriverTimeoutException) { }
 
-                        urunler.Add(new UrunKart
+                    string source = driver.PageSource;
+
+                    var doc = new HtmlAgilityPack.HtmlDocument();
+                    doc.LoadHtml(source);
+
+                    var urunler = new List<UrunKart>();
+
+                    var kartlar = doc.DocumentNode.SelectNodes("//li[contains(@class,'productListContent-')]");
+                    kartlar ??= doc.DocumentNode.SelectNodes("//div[contains(@data-test-id,'product-card')]");
+
+                    if (kartlar != null)
+                    {
+                        foreach (var kart in kartlar.Take(20))
                         {
-                            Ad = ad,
-                            Fiyat = fiyat,
-                            ResimUrl = resim ?? "",
-                            UrunUrl = link ?? ""
-                        });
+                            var adNode = kart.SelectSingleNode(".//*[starts-with(@data-test-id,'title-')]");
+                            var fiyatNode = kart.SelectSingleNode(".//*[starts-with(@data-test-id,'final-price-')]");
+                            var resimNode = kart.SelectSingleNode(".//img");
+                            var linkNode = kart.SelectSingleNode(".//a[@href]");
+
+                            var ad = adNode?.InnerText?.Trim() ?? linkNode?.GetAttributeValue("title", "")?.Trim();
+                            var fiyat = fiyatNode?.InnerText?.Trim();
+                            var resim = resimNode?.GetAttributeValue("src", "");
+                            var link = linkNode?.GetAttributeValue("href", "");
+
+                            if (!string.IsNullOrWhiteSpace(ad) && !string.IsNullOrWhiteSpace(fiyat))
+                            {
+                                if (link != null && !link.StartsWith("http"))
+                                    link = "https://www.hepsiburada.com" + link;
+
+                                urunler.Add(new UrunKart
+                                {
+                                    Ad = ad,
+                                    Fiyat = fiyat,
+                                    ResimUrl = resim ?? "",
+                                    UrunUrl = link ?? ""
+                                });
+                            }
+                        }
+                    }
+
+                    return urunler;
+                }
+                finally
+                {
+                    if (!useShared)
+                    {
+                        driver.Quit();
+                        driver.Dispose();
                     }
                 }
-            }
-
-            return urunler;
-        });
+            });
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 
     // ─────────────────────────────────────────────────────────
     // 3) Tek ürün URL'sinden fiyat + ad + resim + satıcı çeker
     // ─────────────────────────────────────────────────────────
-    public Task<UrunDetay> GetUrunDetayAsync(string url)
+    public async Task<UrunDetay> GetUrunDetayAsync(string url)
     {
-        return Task.Run(() =>
+        await _semaphore.WaitAsync();
+        try
         {
-            using var driver = new ChromeDriver(ChromeAyarlari());
-            driver.Navigate().GoToUrl(url);
-            Thread.Sleep(5000);
-
-            var detay = new UrunDetay { Url = url };
-
-            // ── Fiyat ──────────────────────────────────────────────
-            detay.Fiyat = FiyatCek(driver);
-
-            // ── Ürün Adı ───────────────────────────────────────────
-            var adElemanlari = driver.FindElements(By.CssSelector("[data-test-id='title'] h1"));
-            if (adElemanlari.Count == 0)
-                adElemanlari = driver.FindElements(By.CssSelector("[data-test-id='title']"));
-            if (adElemanlari.Count > 0)
+            return await Task.Run(() =>
             {
-                var ad = adElemanlari[0].Text?.Trim();
-                if (!string.IsNullOrWhiteSpace(ad))
-                    detay.Ad = ad;
-            }
+                bool useShared = _sharedDriver != null;
+                var driver = useShared ? _sharedDriver! : new ChromeDriver(ChromeAyarlari());
 
-            // ── Ürün Resmi ─────────────────────────────────────────
-            var resimElemanlari = driver.FindElements(By.CssSelector("picture img"));
-            foreach (var img in resimElemanlari)
-            {
-                var src = img.GetAttribute("src")?.Trim();
-                if (!string.IsNullOrWhiteSpace(src) && src.StartsWith("https://productimages.hepsiburada"))
+                try
                 {
-                    detay.ResimUrl = src;
-                    break;
-                }
-            }
-
-            // Bulamazsa srcset'ten dene
-            if (string.IsNullOrEmpty(detay.ResimUrl))
-            {
-                var sourceElemanlari = driver.FindElements(By.CssSelector("picture source"));
-                foreach (var source in sourceElemanlari)
-                {
-                    var srcset = source.GetAttribute("srcset")?.Trim();
-                    if (!string.IsNullOrWhiteSpace(srcset) && srcset.StartsWith("https://productimages.hepsiburada"))
+                    driver.Navigate().GoToUrl(url);
+                    
+                    var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                    try
                     {
-                        detay.ResimUrl = srcset.Split(' ')[0];
-                        break;
+                        wait.Until(d => d.FindElements(By.CssSelector("[data-test-id='default-price'], [data-test-id='price-current-price'], [data-test-id='title']")).Count > 0);
+                    }
+                    catch (WebDriverTimeoutException) { }
+
+                    var detay = new UrunDetay 
+                    { 
+                        Url = url,
+                        Fiyat = FiyatCek(driver)
+                    };
+
+                    // ── Ürün Adı ───────────────────────────────────────────
+                    var adElemanlari = driver.FindElements(By.CssSelector("[data-test-id='title'] h1"));
+                    if (adElemanlari.Count == 0)
+                        adElemanlari = driver.FindElements(By.CssSelector("[data-test-id='title']"));
+                    if (adElemanlari.Count > 0)
+                    {
+                        var ad = adElemanlari[0].Text?.Trim();
+                        if (!string.IsNullOrWhiteSpace(ad))
+                            detay.Ad = ad;
+                    }
+
+                    // ── Ürün Resmi ─────────────────────────────────────────
+                    var resimElemanlari = driver.FindElements(By.CssSelector("picture img"));
+                    foreach (var img in resimElemanlari)
+                    {
+                        var src = img.GetAttribute("src")?.Trim();
+                        if (!string.IsNullOrWhiteSpace(src) && src.StartsWith("https://productimages.hepsiburada"))
+                        {
+                            detay.ResimUrl = src;
+                            break;
+                        }
+                    }
+
+                    // Bulamazsa srcset'ten dene
+                    if (string.IsNullOrEmpty(detay.ResimUrl))
+                    {
+                        var sourceElemanlari = driver.FindElements(By.CssSelector("picture source"));
+                        foreach (var source in sourceElemanlari)
+                        {
+                            var srcset = source.GetAttribute("srcset")?.Trim();
+                            if (!string.IsNullOrWhiteSpace(srcset) && srcset.StartsWith("https://productimages.hepsiburada"))
+                            {
+                                detay.ResimUrl = srcset.Split(' ')[0];
+                                break;
+                            }
+                        }
+                    }
+
+                    // ── Satıcı Adı ─────────────────────────────────────────
+                    var saticiElemanlari = driver.FindElements(By.CssSelector("[data-test-id='buyBox-seller'] a"));
+                    if (saticiElemanlari.Count > 0)
+                    {
+                        var satici = saticiElemanlari[0].GetAttribute("title")?.Trim();
+                        if (string.IsNullOrWhiteSpace(satici))
+                            satici = saticiElemanlari[0].Text?.Trim();
+                        if (!string.IsNullOrWhiteSpace(satici))
+                            detay.Satici = satici;
+                    }
+
+                    return detay;
+                }
+                finally
+                {
+                    if (!useShared)
+                    {
+                        driver.Quit();
+                        driver.Dispose();
                     }
                 }
-            }
-
-            // ── Satıcı Adı ─────────────────────────────────────────
-            var saticiElemanlari = driver.FindElements(By.CssSelector("[data-test-id='buyBox-seller'] a"));
-            if (saticiElemanlari.Count > 0)
-            {
-                var satici = saticiElemanlari[0].GetAttribute("title")?.Trim();
-                if (string.IsNullOrWhiteSpace(satici))
-                    satici = saticiElemanlari[0].Text?.Trim();
-                if (!string.IsNullOrWhiteSpace(satici))
-                    detay.Satici = satici;
-            }
-
-            return detay;
-        });
+            });
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 }
 
