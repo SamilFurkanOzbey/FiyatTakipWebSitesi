@@ -1,0 +1,164 @@
+﻿@page "/takip"
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<h2>⭐ Takip Ettiklerim</h2>
+
+<div style="margin-bottom:20px;">
+
+    <!-- LINK INPUT -->
+    <input @bind="yeniLink"
+           placeholder="Ürün linki yapıştır..."
+           style="width:300px; padding:6px;" />
+
+    <!-- KATEGORİ -->
+    <select @bind="secilenKategori" style="margin-left:10px; padding:6px;">
+        @foreach (var kategori in kategoriler)
+        {
+            <option value="@kategori">@kategori</option>
+        }
+    </select>
+
+    <!-- BUTON -->
+    <button class="btn btn-primary"
+            style="margin-left:10px;"
+            @onclick="UrunEkle">
+        Ekle
+    </button>
+
+</div>
+
+<p style="color:green">@mesaj</p>
+
+<hr />
+
+<h4>📦 Takip Listesi</h4>
+
+<div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+    @foreach (var urun in urunler)
+    {
+        <div class="card" style="width: 18rem;">
+            <div class="card-body">
+
+                <h5 class="card-title">@urun.Ad</h5>
+                <p class="card-text">@urun.Fiyat</p>
+
+                <span class="badge bg-secondary">@urun.Kategori</span>
+
+                <br /><br />
+
+                <button class="btn btn-sm btn-danger"
+                        @onclick="() => Sil(urun)">
+                    Sil
+                </button>
+
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+
+    // KATEGORİLER
+    List<string> kategoriler = new()
+    {
+        "Telefon",
+        "Bilgisayar",
+        "Elektronik",
+        "Giyim",
+        "Diğer"
+    };
+
+    string secilenKategori = "Telefon";
+
+    // MODEL
+    public class Urun
+    {
+        public string Ad { get; set; }
+        public string Fiyat { get; set; }
+        public string Kategori { get; set; }
+    }
+
+    // LİSTE
+    List<Urun> urunler = new();
+
+    string yeniLink = "";
+    string mesaj = "";
+
+    // SAYFA AÇILINCA ÇALIŞIR
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var data = await JS.InvokeAsync<string>("localStorage.getItem", "takipUrunler");
+
+            if (!string.IsNullOrEmpty(data))
+            {
+                urunler = System.Text.Json.JsonSerializer.Deserialize<List<Urun>>(data);
+                StateHasChanged();
+            }
+        }
+    }
+
+    // ÜRÜN EKLE
+    async Task UrunEkle()
+    {
+        if (string.IsNullOrWhiteSpace(yeniLink))
+        {
+            mesaj = "Link gir!";
+            return;
+        }
+
+        var yeniUrun = new Urun
+        {
+            Ad = ParseUrunAdi(yeniLink),
+            Fiyat = "Henüz çekilmedi",
+            Kategori = secilenKategori
+        };
+
+        urunler.Add(yeniUrun);
+
+        // KAYDET
+        await JS.InvokeVoidAsync("localStorage.setItem",
+            "takipUrunler",
+            System.Text.Json.JsonSerializer.Serialize(urunler));
+
+        yeniLink = "";
+        mesaj = "Ürün eklendi!";
+    }
+
+    // ÜRÜN SİL
+    async Task Sil(Urun urun)
+    {
+        urunler.Remove(urun);
+
+        await JS.InvokeVoidAsync("localStorage.setItem",
+            "takipUrunler",
+            System.Text.Json.JsonSerializer.Serialize(urunler));
+    }
+
+    // LINKTEN İSİM ÇIKAR
+    string ParseUrunAdi(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            string path = uri.AbsolutePath;
+
+            string name = path.Replace("/", "")
+                              .Replace("-", " ")
+                              .Replace("_", " ");
+
+            if (string.IsNullOrWhiteSpace(name))
+                return "Ürün";
+
+            return char.ToUpper(name[0]) + name.Substring(1);
+        }
+        catch
+        {
+            return "Geçersiz link";
+        }
+    }
+}

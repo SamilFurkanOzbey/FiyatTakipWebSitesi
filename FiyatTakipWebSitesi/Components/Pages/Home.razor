@@ -1,7 +1,160 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+<PageTitle>Ana Sayfa</PageTitle>
 
-<PageTitle>Home</PageTitle>
+<div class="home-container">
 
-<h1>Hello, world!</h1>
+    <div class="hero">
+        <h1>Fiyat Takip</h1>
+        <p>Ürünleri incele ve fiyat geçmişlerini takip et.</p>
+    </div>
 
-Welcome to your new app.
+    <NavLink href="/kategoriler" class="tum-kategori-btn">
+        Tüm Kategoriler Sayfasına Git
+    </NavLink>
+
+    <div class="kategori-row">
+        @foreach (var kategori in kategoriler)
+        {
+            <button class="kategori-btn @(secilenKategori == kategori ? "active" : "")"
+                    @onclick="() => KategoriToggle(kategori)">
+                @kategori @(secilenKategori == kategori ? "▲" : "▼")
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(secilenKategori) && gosterilenUrunler.Any())
+    {
+        <div class="urun-grid">
+            @foreach (var urun in gosterilenUrunler)
+            {
+                <div class="urun-card">
+                    <img src="@urun.Resim" alt="@urun.Ad" />
+                    <h4>@urun.Ad</h4>
+                    <p class="fiyat">@urun.Fiyat</p>
+
+                    <div class="btn-row">
+                        <NavLink href="/UrunDetaySayfasi" class="detay-btn">Detay</NavLink>
+                        <NavLink href="/Analiz" class="grafik-btn">Grafik</NavLink>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(secilenKategori))
+    {
+        <div class="bos-uyari">
+            <p>Bu kategoriye ait örnek ürünler henüz eklenmedi. (Şimdilik sadece Elektronik ve Moda dolu)</p>
+        </div>
+    }
+
+</div>
+
+<style>
+    body { background: #0f172a; color: white; font-family: 'Segoe UI'; }
+    .home-container { padding: 30px; }
+    .hero h1 { font-size: 42px; font-weight: bold; }
+    .hero p { color: #94a3b8; margin-bottom: 20px; }
+    
+    .tum-kategori-btn { 
+        display: inline-block; 
+        background: #1e293b; 
+        color: #38bdf8; 
+        text-decoration: none; 
+        padding: 10px 20px; 
+        border: 1px solid #38bdf8;
+        border-radius: 10px; 
+        margin-bottom: 30px;
+        transition: 0.3s;
+    }
+    .tum-kategori-btn:hover { background: #38bdf8; color: #0f172a; }
+
+    .kategori-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 30px; }
+    
+    .kategori-btn { 
+        background: #1e293b; 
+        color: white; 
+        border: 2px solid #334155; 
+        padding: 15px 25px; 
+        border-radius: 14px; 
+        cursor: pointer; 
+        font-size: 16px;
+        font-weight: 500;
+        transition: 0.3s;
+    }
+    .kategori-btn:hover { border-color: #38bdf8; }
+    .kategori-btn.active { background: #0284c7; border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
+
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; animation: fadeIn 0.5s; }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .urun-card { background: #1e293b; padding: 15px; border-radius: 18px; border: 1px solid #334155; }
+    .urun-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; }
+    .fiyat { color: #38bdf8; font-weight: bold; font-size: 1.2rem; }
+    .btn-row { display: flex; gap: 10px; margin-top: 15px; }
+    .detay-btn { background: #475569; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
+    .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
+    .bos-uyari { padding: 30px; text-align: center; background: #1e293b; border-radius: 15px; color: #94a3b8; }
+</style>
+
+@code {
+    List<string> kategoriler = new() { "Elektronik", "Moda", "Ev", "Spor", "Kitap", "Kozmetik" };
+    List<Urun> tumUrunler = new();
+    List<Urun> gosterilenUrunler = new();
+    string secilenKategori = "";
+
+    protected override void OnInitialized()
+    {
+        UrunleriYukle();
+    }
+
+    void UrunleriYukle()
+    {
+        string[] elektronikler = { "iPhone 15", "MacBook Air", "Sony WH-1000XM5", "Logitech G502", "Razer BlackWidow", "Samsung Odyssey G7", "iPad Pro", "Apple Watch S9", "Samsung T7 SSD", "Logitech C920", "JBL Flip 6", "Meta Quest 3" };
+        string[] modalar = { "Siyah Trençkot", "Oversize Hoodie", "Air Jordan 1", "Basic Beyaz Tişört", "Slim Fit Gömlek", "Chelsea Bot", "Ray-Ban Wayfarer", "North Face Çanta", "V Yaka Kazak", "Chino Pantolon", "Gece Elbisesi", "Kolombiya Mont" };
+
+        for (int i = 0; i < 12; i++)
+        {
+            // Elektronik Ekle
+            tumUrunler.Add(new Urun {
+                Ad = elektronikler[i],
+                Fiyat = $"{new Random().Next(3000, 60000)} TL",
+                Kategori = "Elektronik",
+                Resim = $"https://picsum.photos/400/300?random=e{i}"
+            });
+
+            // Moda Ekle
+            tumUrunler.Add(new Urun {
+                Ad = modalar[i],
+                Fiyat = $"{new Random().Next(500, 8000)} TL",
+                Kategori = "Moda",
+                Resim = $"https://picsum.photos/400/600?random=m{i}"
+            });
+        }
+    }
+
+    void KategoriToggle(string kategori)
+    {
+        if (secilenKategori == kategori)
+        {
+            secilenKategori = ""; // Aynı kategoriye basılırsa kapat
+            gosterilenUrunler.Clear();
+        }
+        else
+        {
+            secilenKategori = kategori;
+            gosterilenUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
+        }
+    }
+
+    class Urun {
+        public string Ad { get; set; } = "";
+        public string Fiyat { get; set; } = "";
+        public string Kategori { get; set; } = "";
+        public string Resim { get; set; } = "";
+    }
+}

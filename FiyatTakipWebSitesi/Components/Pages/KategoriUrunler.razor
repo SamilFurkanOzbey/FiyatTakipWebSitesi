@@ -1,374 +1,97 @@
-﻿@* Bu sayfa /kategoriler route'unda çalışır *@
-@page "/kategoriler"
-
-@* ScraperService'i bu sayfaya inject ediyoruz — fiyat/ürün çekme işlemleri oradan gelir *@
-@inject ScraperService Scraper
-
-@* InteractiveServer: buton tıklama, liste güncelleme gibi olayların çalışması için gerekli *@
+﻿@page "/kategoriler"
 @rendermode InteractiveServer
+<PageTitle>Kategoriler</PageTitle>
 
-@* Ana kapsayıcı — sol panel (kategoriler) ve sağ panel (ürünler) yan yana *@
-<div class="kategori-sayfa">
-
-    @* ===== SOL PANEL: KATEGORİ LİSTESİ ===== *@
-    <div class="kategori-panel">
-        <h5 class="panel-baslik">📦 Kategoriler</h5>
-
-        @* Kategoriler listesindeki her öğeyi döngüyle ekrana bas *@
-        @foreach (var kat in Kategoriler)
+<div class="kategori-page">
+    <div class="sidebar">
+        <h3>Kategoriler</h3>
+        @foreach (var kategori in kategoriler)
         {
-            @* Seçili kategori ise "aktif" class'ı ekle, değilse boş bırak *@
-            <div class="kategori-item @(SecilenKategori?.Ad == kat.Ad ? "aktif" : "")"
-                 @onclick="() => KategoriSec(kat)">
-                @* Tıklanınca KategoriSec metodunu çağır *@
-                <span class="kat-icon">@kat.Icon</span>
-                <span class="kat-ad">@kat.Ad</span>
+            <div class="kategori-item @(secilenKategori == kategori ? "active" : "")"
+                 @onclick="() => KategoriSec(kategori)">
+                @kategori
             </div>
         }
     </div>
 
-    @* ===== SAĞ PANEL: ÜRÜN GÖRÜNÜMÜ ===== *@
-    <div class="urun-panel">
-
-        @* Henüz hiçbir kategori seçilmemişse yönlendirme mesajı göster *@
-        @if (SecilenKategori == null)
+    <div class="content">
+        @if (string.IsNullOrEmpty(secilenKategori))
         {
-            <div class="bos-durum">
-                <span>👈</span>
-                <p>Ürünleri görmek için bir kategori seçin</p>
-            </div>
+            <h2>Kategori Seçiniz</h2>
+            <p>Ürünleri listelemek için soldan bir başlığa tıklayın.</p>
         }
-
-        @* Scraper arka planda çalışıyorsa dönen animasyon ve bilgi mesajı göster *@
-        else if (isLoading)
-        {
-            <div class="yukleniyor">
-                <div class="spinner"></div>
-                <p>@SecilenKategori.Ad kategorisi yükleniyor...</p>
-            </div>
-        }
-
-        @* Scraper'dan hata döndüyse kırmızı uyarı kutusu göster *@
-        else if (!string.IsNullOrEmpty(Hata))
-        {
-            <div class="alert alert-danger">❌ @Hata</div>
-        }
-
-        @* Hata yok ama hiç ürün de bulunamadıysa boş durum mesajı göster *@
-        else if (Urunler.Count == 0)
-        {
-            <div class="bos-durum">
-                <span>🔍</span>
-                <p>Bu kategoride ürün bulunamadı.</p>
-            </div>
-        }
-
-        @* Her şey yolundaysa ürünleri grid olarak listele *@
         else
         {
-            @* Kategori adı ve kaç ürün bulunduğunu gösteren başlık satırı *@
-            <div class="urun-baslik-row">
-                <h5>🛍️ @SecilenKategori.Ad <span class="badge bg-secondary">@Urunler.Count ürün</span></h5>
-            </div>
-
-            @* Ürün kartları grid düzeninde *@
-            <div class="urun-grid">
-                @foreach (var urun in Urunler)
-                {
-                    @* Her kart tıklanabilir bir link — ürünün Hepsiburada sayfasını yeni sekmede açar *@
-                    <a href="@urun.UrunUrl" target="_blank" class="urun-kart">
-
-                        @* Ürün resmi varsa göster, yoksa placeholder emoji koy *@
-                        @if (!string.IsNullOrEmpty(urun.ResimUrl))
-                        {
-                            <img src="@urun.ResimUrl" alt="@urun.Ad" class="urun-resim" />
-                        }
-                        else
-                        {
-                            <div class="urun-resim-yok">🖼️</div>
-                        }
-
-                        @* Ürün adı ve fiyatı alt kısımda *@
-                        <div class="urun-bilgi">
-                            <p class="urun-ad">@urun.Ad</p>
-                            <p class="urun-fiyat">@urun.Fiyat</p>
+            <h2>@secilenKategori Bölümü</h2>
+            @if (filtreliUrunler.Any())
+            {
+                <div class="urun-grid">
+                    @foreach (var urun in filtreliUrunler)
+                    {
+                        <div class="urun-card">
+                            <img src="@urun.Resim" />
+                            <h4>@urun.Ad</h4>
+                            <p class="fiyat">@urun.Fiyat</p>
+                            <div class="btn-row">
+                                <NavLink href="/UrunDetaySayfasi" class="detay-btn">Detay</NavLink>
+                                <NavLink href="/Analiz" class="grafik-btn">Grafik</NavLink>
+                            </div>
                         </div>
-                    </a>
-                }
-            </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="bos-mesaj">Bu kategori henüz doldurulmadı.</div>
+            }
         }
     </div>
 </div>
 
 <style>
-    /* Ana kapsayıcı: sol panel + sağ panel yan yana, sayfa yüksekliğini doldurur */
-    .kategori-sayfa {
-        display: flex;
-        height: calc(100vh - 80px); /* Navbar yüksekliği (80px) çıkarılır */
-        gap: 0;
-        font-family: 'Segoe UI', sans-serif;
-    }
-
-    /* ===== KATEGORİ PANELİ ===== */
-
-    /* Sol panel: sabit genişlik, koyu arka plan, taşarsa kaydırma çubuğu */
-    .kategori-panel {
-        width: 200px;
-        min-width: 200px;
-        background: #1a1a2e;
-        border-right: 1px solid #2d2d4e;
-        padding: 16px 0;
-        overflow-y: auto;
-    }
-
-    /* "KATEGORİLER" başlık yazısı — küçük, soluk renk, büyük harf */
-    .panel-baslik {
-        color: #a0a0c0;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        padding: 0 16px 12px;
-        border-bottom: 1px solid #2d2d4e;
-        margin-bottom: 8px;
-    }
-
-    /* Her kategori satırı: flex ile icon ve metin yan yana, hover animasyonu var */
-    .kategori-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 16px;
-        cursor: pointer;
-        color: #c0c0d8;
-        transition: background 0.15s, color 0.15s;
-        border-left: 3px solid transparent; /* Seçili değilken sol çizgi görünmez */
-    }
-
-        /* Üzerine gelinince hafif aydınlanır */
-        .kategori-item:hover {
-            background: #2a2a4a;
-            color: #fff;
-        }
-
-        /* Seçili kategori: mor sol çizgi ve vurgu rengi */
-        .kategori-item.aktif {
-            background: #2a2a4a;
-            color: #7c83fd;
-            border-left: 3px solid #7c83fd;
-            font-weight: 600;
-        }
-
-    .kat-icon {
-        font-size: 1.1rem;
-    }
-
-    .kat-ad {
-        font-size: 0.88rem;
-    }
-
-    /* ===== ÜRÜN PANELİ ===== */
-
-    /* Sağ panel: kalan tüm genişliği kaplar, dikey kaydırma açık */
-    .urun-panel {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px;
-        background: #0f0f1e;
-    }
-
-    .urun-baslik-row {
-        margin-bottom: 16px;
-    }
-
-        .urun-baslik-row h5 {
-            color: #e0e0f0;
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-    /* Responsive grid: her kart en az 180px, sığdığı kadar yan yana dizilir */
-    .urun-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 16px;
-    }
-
-    /* Ürün kartı: koyu arka plan, yuvarlatılmış köşe, hover'da yukarı kalkar */
-    .urun-kart {
-        background: #1a1a2e;
-        border: 1px solid #2d2d4e;
-        border-radius: 10px;
-        overflow: hidden;
-        text-decoration: none; /* Link altı çizgisini kaldır */
-        color: inherit;
-        transition: transform 0.15s, border-color 0.15s;
-        display: flex;
-        flex-direction: column;
-    }
-
-        /* Hover: kart 3px yukarı kalkar ve border moru olur */
-        .urun-kart:hover {
-            transform: translateY(-3px);
-            border-color: #7c83fd;
-        }
-
-    /* Ürün resmi: sabit yükseklik, içeriği orantılı sığdır, beyaz arka plan */
-    .urun-resim {
-        width: 100%;
-        height: 150px;
-        object-fit: contain;
-        background: #fff;
-        padding: 8px;
-    }
-
-    /* Resim yoksa gösterilen placeholder kutu */
-    .urun-resim-yok {
-        width: 100%;
-        height: 150px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2rem;
-        background: #2a2a4a;
-    }
-
-    .urun-bilgi {
-        padding: 10px;
-        flex: 1;
-    }
-
-    /* Ürün adı: küçük font, soluk renk, max 2 satır — taşarsa "..." */
-    .urun-ad {
-        font-size: 0.78rem;
-        color: #c0c0d8;
-        margin: 0 0 6px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2; /* Maksimum 2 satır göster */
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        line-height: 1.4;
-    }
-
-    /* Fiyat: büyük ve mor, kartın en dikkat çekici elemanı */
-    .urun-fiyat {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: #7c83fd;
-        margin: 0;
-    }
-
-    /* ===== DURUM EKRANLARI ===== */
-
-    /* Boş durum (kategori seçilmedi / ürün yok): ortaya hizalanmış mesaj */
-    .bos-durum {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: #606080;
-        gap: 12px;
-        font-size: 0.95rem;
-    }
-
-        .bos-durum span {
-            font-size: 3rem;
-        }
-
-    /* Yükleniyor ekranı: spinner + metin ortada */
-    .yukleniyor {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: #7c83fd;
-        gap: 16px;
-    }
-
-    /* CSS spinner: border'ın bir kenarı renkli, döndürülünce animasyon oluşur */
-    .spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid #2d2d4e; /* Soluk çerçeve */
-        border-top-color: #7c83fd; /* Sadece üst kenar renkli — dönüş hissi */
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-
-    /* Spinner dönüş animasyonu */
-    @@keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
+    .kategori-page { display: flex; min-height: 100vh; background: #0f172a; }
+    .sidebar { width: 250px; background: #111827; padding: 20px; border-right: 1px solid #1e293b; }
+    .kategori-item { color: white; background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; }
+    .kategori-item.active { background: #0284c7; }
+    .content { flex: 1; padding: 30px; color: white; }
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+    .urun-card { background: #1e293b; padding: 15px; border-radius: 15px; border: 1px solid #334155; }
+    .urun-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 10px; }
+    .fiyat { color: #38bdf8; font-weight: bold; }
+    .btn-row { display: flex; gap: 8px; margin-top: 15px; }
+    .detay-btn { background: #475569; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; }
+    .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; }
+    .bos-mesaj { padding: 40px; text-align:center; color: #94a3b8; }
 </style>
 
 @code {
-    // -------------------------------------------------------
-    // Sabit kategori listesi.
-    // Yeni kategori eklemek için buraya satır ekle:
-    // new("Görünen Ad", "Emoji", "Hepsiburada URL'si")
-    // -------------------------------------------------------
-    private List<KategoriItem> Kategoriler = new()
+    List<string> kategoriler = new() { "Elektronik", "Moda", "Ev", "Spor", "Kitap", "Kozmetik" };
+    List<Urun> tumUrunler = new();
+    List<Urun> filtreliUrunler = new();
+    string secilenKategori = "";
+
+    protected override void OnInitialized()
     {
-        new("Telefon",          "📱", "https://www.hepsiburada.com/cep-telefonlari-c-371965"),
-        new("Laptop",           "💻", "https://www.hepsiburada.com/laptop-notebook-dizustu-bilgisayarlar-c-98"),
-        new("Tablet",           "📟", "https://www.hepsiburada.com/tabletler-c-368"),
-        new("Kulaklık",         "🎧", "https://www.hepsiburada.com/kulakliklar-c-405158"),
-        new("Televizyon",       "📺", "https://www.hepsiburada.com/televizyonlar-c-87"),
-        new("Buzdolabı",        "🧊", "https://www.hepsiburada.com/buzdolaplari-c-60"),
-        new("Çamaşır Makinesi", "🫧", "https://www.hepsiburada.com/camasir-makineleri-c-61"),
-        new("Oyun Konsolu",     "🎮", "https://www.hepsiburada.com/oyunlar-oyun-konsollari-c-2147483602"),
-        new("Kamera",           "📷", "https://www.hepsiburada.com/fotograf-makineleri-c-105"),
-        new("Aksesuar",         "🔌", "https://www.hepsiburada.com/tum-cep-telefonu-aksesuarlari-c-371966"),
-    };
+        string[] elektronikler = { "iPhone 15", "MacBook Air", "Sony WH-1000XM5", "Logitech G502", "Razer BlackWidow", "Samsung Odyssey G7", "iPad Pro", "Apple Watch S9", "Samsung T7 SSD", "Logitech C920", "JBL Flip 6", "Meta Quest 3" };
+        string[] modalar = { "Siyah Trençkot", "Oversize Hoodie", "Air Jordan 1", "Basic Beyaz Tişört", "Slim Fit Gömlek", "Chelsea Bot", "Ray-Ban Wayfarer", "North Face Çanta", "V Yaka Kazak", "Chino Pantolon", "Gece Elbisesi", "Kolombiya Mont" };
 
-    // Şu an seçili olan kategori — null ise hiçbiri seçilmemiş demek
-    private KategoriItem? SecilenKategori;
-
-    // Scraper'dan gelen ürün listesi — her kategori seçiminde sıfırlanır
-    private List<UrunKart> Urunler = new();
-
-    // Scraper arka planda çalışıyorken true — UI spinner gösterir
-    private bool isLoading = false;
-
-    // Hata varsa mesaj buraya yazılır, yoksa boş kalır
-    private string Hata = "";
-
-    // -------------------------------------------------------
-    // KategoriSec: Kullanıcı bir kategoriye tıkladığında çalışır.
-    // Eski ürünleri temizler, scraper'ı çalıştırır, sonuçları atar.
-    // -------------------------------------------------------
-    private async Task KategoriSec(KategoriItem kat)
-    {
-        // Zaten yükleme devam ediyorsa tekrar tetikleme
-        if (isLoading) return;
-
-        SecilenKategori = kat; // Seçili kategoriyi güncelle
-        Urunler.Clear();       // Önceki kategorinin ürünlerini temizle
-        Hata = "";             // Önceki hata mesajını temizle
-        isLoading = true;      // Spinner'ı göster
-
-        try
+        for (int i = 0; i < 12; i++)
         {
-            // ScraperService'ten kategori ürünlerini al (async — UI bloklanmaz)
-            Urunler = await Scraper.GetKategoriUrunleriAsync(kat.Url);
-        }
-        catch (Exception ex)
-        {
-            // Beklenmedik hata olursa (Chrome bulunamadı, timeout, vb.) mesajı göster
-            Hata = $"Ürünler yüklenirken hata oluştu: {ex.Message}";
-        }
-        finally
-        {
-            // Başarılı ya da hatalı, her durumda spinner'ı kapat
-            isLoading = false;
+            tumUrunler.Add(new Urun { Ad = elektronikler[i], Fiyat = "15.000 TL", Kategori = "Elektronik", Resim = $"https://picsum.photos/400/300?random=e{i}" });
+            tumUrunler.Add(new Urun { Ad = modalar[i], Fiyat = "2.500 TL", Kategori = "Moda", Resim = $"https://picsum.photos/400/500?random=m{i}" });
         }
     }
 
-    // Her kategorinin taşıdığı 3 bilgi: görünen ad, emoji, Hepsiburada URL'si
-    private record KategoriItem(string Ad, string Icon, string Url);
+    void KategoriSec(string kategori)
+    {
+        secilenKategori = kategori;
+        filtreliUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
+    }
+
+    class Urun {
+        public string Ad { get; set; } = "";
+        public string Fiyat { get; set; } = "";
+        public string Kategori { get; set; } = "";
+        public string Resim { get; set; } = "";
+    }
 }

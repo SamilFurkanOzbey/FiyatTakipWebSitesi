@@ -80,6 +80,8 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 
 // ── Migration & Seed ──────────────────────────────────────────────────────────
+
+/*
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -88,6 +90,8 @@ await using (var scope = app.Services.CreateAsyncScope())
     var kategoriService = scope.ServiceProvider.GetRequiredService<KategoriService>();
     await kategoriService.SeedVarsayilanKategorilerAsync();
 }
+
+*/
 
 // ── HTTP Pipeline ─────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
