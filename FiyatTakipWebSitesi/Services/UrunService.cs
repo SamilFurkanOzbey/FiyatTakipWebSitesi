@@ -17,10 +17,17 @@ namespace FiyatTakipWebSitesi.Services;
 public class UrunService
 {
     private readonly ApplicationDbContext _context;
+    private readonly UyariService _uyariService;
+    private readonly FiyatGecmisiService _fiyatGecmisiService;
 
-    public UrunService(ApplicationDbContext context)
+    public UrunService(
+        ApplicationDbContext context,
+        UyariService uyariService,
+        FiyatGecmisiService fiyatGecmisiService)
     {
-        _context = context;
+        _context             = context;
+        _uyariService        = uyariService;
+        _fiyatGecmisiService = fiyatGecmisiService;
     }
 
     // --- Okuma ---
@@ -80,7 +87,9 @@ public class UrunService
 
     public async Task<bool> FiyatGuncelleAsync(int urunId, decimal yeniFiyat, bool stokVar = true)
     {
-        var urun = await _context.Urunler.FindAsync(urunId);
+        var urun = await _context.Urunler
+            .Include(u => u.Kullanici)
+            .FirstOrDefaultAsync(u => u.Id == urunId);
         if (urun is null) return false;
 
         var eskiFiyat = urun.SonFiyati;
@@ -111,6 +120,14 @@ public class UrunService
 
         _context.FiyatGecmisleri.Add(fiyatGecmisi);
         await _context.SaveChangesAsync();
+
+        // Uyarı kontrolü (sadece fiyat değiştiyse)
+        if (degisim != 0)
+        {
+            var isRekorDusuk = await _fiyatGecmisiService.IsRekorDusukAsync(urunId, yeniFiyat);
+            await _uyariService.FiyatDegisimUyariKontrolAsync(urun, eskiFiyat, yeniFiyat, isRekorDusuk);
+        }
+
         return true;
     }
 

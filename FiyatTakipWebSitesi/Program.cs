@@ -47,7 +47,35 @@ builder.Services.AddScoped<ScraperService>();
 builder.Services.AddScoped<UrunService>();
 builder.Services.AddScoped<FiyatGecmisiService>();
 builder.Services.AddScoped<KategoriService>();
+builder.Services.AddScoped<KullaniciService>();
+builder.Services.AddScoped<UyariService>();
 builder.Services.AddTransient<FiyatGuncellemeJob>();
+
+// ── Authentication & Authorization ────────────────────────────────────────────
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "FiyatTakipGizliAnahtar2026!XyZ#AbC$DeF%GhI&JkL";
+var issuer = builder.Configuration["Jwt:Issuer"] ?? "FiyatTakipWebSitesi";
+var audience = builder.Configuration["Jwt:Audience"] ?? "FiyatTakipKullanicilari";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey))
+    };
+});
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -70,6 +98,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 // ── Hangfire Dashboard ────────────────────────────────────────────────────────
