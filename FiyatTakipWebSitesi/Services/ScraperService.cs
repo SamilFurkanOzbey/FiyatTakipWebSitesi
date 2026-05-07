@@ -1,4 +1,4 @@
-﻿using OpenQA.Selenium;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using HtmlAgilityPack;
 
@@ -6,6 +6,12 @@ namespace FiyatTakipWebSitesi.Services;
 
 public class ScraperService
 {
+    private readonly ILogger<ScraperService> _logger;
+
+    public ScraperService(ILogger<ScraperService> logger)
+    {
+        _logger = logger;
+    }
     private static ChromeOptions ChromeAyarlari()
     {
         var options = new ChromeOptions();
@@ -73,14 +79,12 @@ public class ScraperService
     {
         return Task.Run(() =>
         {
-            var logPath = @"C:\Users\furko\OneDrive\Masaüstü\DebugLog.txt";
-
             using var driver = new ChromeDriver(ChromeAyarlari());
             driver.Navigate().GoToUrl(url);
             Thread.Sleep(5000);
 
             var fiyat = FiyatCek(driver);
-            System.IO.File.WriteAllText(logPath, $"URL: {url}\nFiyat: {fiyat}\n");
+            _logger.LogDebug("[ScraperService] URL: {Url} | Fiyat: {Fiyat}", url, fiyat);
             return fiyat;
         });
     }

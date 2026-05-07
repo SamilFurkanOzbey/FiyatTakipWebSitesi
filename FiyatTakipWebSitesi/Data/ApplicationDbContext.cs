@@ -14,7 +14,6 @@ namespace FiyatTakipWebSitesi.Data;
 
 public class ApplicationDbContext : DbContext
 {
-    // Veritabanı bağlantı ayarlarını (connection string vb.) dışarıdan alır
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }

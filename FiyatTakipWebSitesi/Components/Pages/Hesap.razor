@@ -1,0 +1,84 @@
+﻿@page "/hesap"
+
+<PageTitle>Hesap</PageTitle>
+
+<div class="hesap-page">
+
+    ```
+    <div class="hesap-card">
+
+        <div class="avatar">
+            👤
+        </div>
+
+        <h2>Kullanıcı Hesabı</h2>
+
+        <p class="mail">
+            ornekmail@gmail.com
+        </p>
+
+        <div class="istatistik">
+
+            <div class="box">
+                <h3>12</h3>
+                <span>Takip Edilen</span>
+            </div>
+
+            <div class="box">
+                <h3>5</h3>
+                <span>Bildirim</span>
+            </div>
+
+        </div>
+
+    </div>
+    ```
+
+</div>
+
+<style>
+
+    .hesap-page {
+        min-height: 100vh;
+        background: #0f172a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .hesap-card {
+        background: #1e293b;
+        color: white;
+        padding: 40px;
+        border-radius: 20px;
+        width: 400px;
+        text-align: center;
+    }
+
+    .avatar {
+        font-size: 5rem;
+    }
+
+    .mail {
+        color: #94a3b8;
+    }
+
+    .istatistik {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+    }
+
+    .box {
+        background: #111827;
+        padding: 20px;
+        border-radius: 14px;
+        width: 45%;
+    }
+
+        .box h3 {
+            color: #60a5fa;
+            font-size: 2rem;
+        }
+
+</style>
