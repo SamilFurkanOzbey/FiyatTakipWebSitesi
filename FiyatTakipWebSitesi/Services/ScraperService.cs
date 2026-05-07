@@ -84,7 +84,7 @@ public class ScraperService
             return fiyat;
         });
     }
-
+    
     // ─────────────────────────────────────────────────────────
     // 2) Kategori sayfasından ürün listesi çeker — KategoriUrunler.razor
     // ─────────────────────────────────────────────────────────
