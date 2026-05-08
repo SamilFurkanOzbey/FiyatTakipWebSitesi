@@ -114,5 +114,10 @@ public class ApplicationDbContext : DbContext
         // Uyarılarda oluşturulma tarihine göre hızlı sorgulama için index
         modelBuilder.Entity<Uyari>()
             .HasIndex(uy => uy.OlusturulmaTarihi);
+
+        // Global Query Filters (Soft-delete için)
+        // Silinmemiş (Aktif == true) kayıtları otomatik olarak getirir.
+        modelBuilder.Entity<Urun>().HasQueryFilter(u => u.Aktif);
+        modelBuilder.Entity<Kullanici>().HasQueryFilter(k => k.Aktif);
     }
 }

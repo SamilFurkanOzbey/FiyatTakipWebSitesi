@@ -42,14 +42,14 @@ public class UrunService
     public async Task<List<Urun>> GetByKategoriAsync(int kategoriId)
         => await _context.Urunler
             .Include(u => u.Kategori)
-            .Where(u => u.KategoriId == kategoriId && u.Aktif)
+            .Where(u => u.KategoriId == kategoriId)
             .OrderByDescending(u => u.EklendigiTarih)
             .ToListAsync();
 
     public async Task<List<Urun>> GetByKullaniciAsync(int kullaniciId)
         => await _context.Urunler
             .Include(u => u.Kategori)
-            .Where(u => u.UserId == kullaniciId && u.Aktif)
+            .Where(u => u.UserId == kullaniciId)
             .OrderByDescending(u => u.EklendigiTarih)
             .ToListAsync();
 

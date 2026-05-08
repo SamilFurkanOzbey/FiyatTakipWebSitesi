@@ -31,7 +31,12 @@ public class KategoriService
 
     public async Task<Kategori?> GetByIdAsync(int id)
         => await _context.Kategoriler
+<<<<<<< Updated upstream
             .Include(k => k.Urunler.Where(u => u.Aktif))
+=======
+            .AsNoTracking()
+            .Include(k => k.Urunler)
+>>>>>>> Stashed changes
             .FirstOrDefaultAsync(k => k.Id == id);
 
     public async Task<Kategori> EkleAsync(Kategori kategori)

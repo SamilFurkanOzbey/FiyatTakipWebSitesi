@@ -19,6 +19,31 @@ public class ScraperService
         return options;
     }
 
+    private void LogScraperError(ChromeDriver driver, string url)
+    {
+        try
+        {
+            var logKlasor = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ScraperErrors");
+            if (!Directory.Exists(logKlasor))
+                Directory.CreateDirectory(logKlasor);
+
+            var uri = new Uri(url);
+            var host = uri.Host.Replace(".", "_");
+            var dosyaAdi = $"Hata_{host}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..4]}";
+
+            var ss = ((ITakesScreenshot)driver).GetScreenshot();
+            ss.SaveAsFile(Path.Combine(logKlasor, $"{dosyaAdi}.png"));
+
+            File.WriteAllText(Path.Combine(logKlasor, $"{dosyaAdi}.html"), driver.PageSource);
+
+            _logger.LogWarning("[ScraperService] Fiyat bulunamadı. Hata logu oluşturuldu: Logs/ScraperErrors/{DosyaAdi}", dosyaAdi);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ScraperService] Hata logu (ekran görüntüsü/html) oluşturulurken bir sorun yaşandı.");
+        }
+    }
+
     // ─────────────────────────────────────────────────────────
     // Ana fiyatı çeken yardımcı metot
     // ─────────────────────────────────────────────────────────
@@ -79,10 +104,38 @@ public class ScraperService
             driver.Navigate().GoToUrl(url);
             Thread.Sleep(5000);
 
+<<<<<<< Updated upstream
             var fiyat = FiyatCek(driver);
             System.IO.File.WriteAllText(logPath, $"URL: {url}\nFiyat: {fiyat}\n");
             return fiyat;
         });
+=======
+                    var fiyat = FiyatCek(driver);
+                    if (fiyat == "Fiyat bulunamadı")
+                    {
+                        LogScraperError(driver, url);
+                    }
+                    if (_logger.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug))
+                    {
+                        _logger.LogDebug("[ScraperService] URL: {Url} | Fiyat: {Fiyat}", url, fiyat);
+                    }
+                    return fiyat;
+                }
+                finally
+                {
+                    if (!useShared)
+                    {
+                        driver.Quit();
+                        driver.Dispose();
+                    }
+                }
+            });
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+>>>>>>> Stashed changes
     }
 
     // ─────────────────────────────────────────────────────────
@@ -177,8 +230,81 @@ public class ScraperService
                 var src = img.GetAttribute("src")?.Trim();
                 if (!string.IsNullOrWhiteSpace(src) && src.StartsWith("https://productimages.hepsiburada"))
                 {
+<<<<<<< Updated upstream
                     detay.ResimUrl = src;
                     break;
+=======
+                    driver.Navigate().GoToUrl(url);
+                    
+                    var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                    try
+                    {
+                        wait.Until(d => d.FindElements(By.CssSelector("[data-test-id='default-price'], [data-test-id='price-current-price'], [data-test-id='title']")).Count > 0);
+                    }
+                    catch (WebDriverTimeoutException) { }
+
+                    var detay = new UrunDetay 
+                    { 
+                        Url = url,
+                        Fiyat = FiyatCek(driver)
+                    };
+
+                    if (detay.Fiyat == "Fiyat bulunamadı")
+                    {
+                        LogScraperError(driver, url);
+                    }
+
+                    // ── Ürün Adı ───────────────────────────────────────────
+                    var adElemanlari = driver.FindElements(By.CssSelector("[data-test-id='title'] h1"));
+                    if (adElemanlari.Count == 0)
+                        adElemanlari = driver.FindElements(By.CssSelector("[data-test-id='title']"));
+                    if (adElemanlari.Count > 0)
+                    {
+                        var ad = adElemanlari[0].Text?.Trim();
+                        if (!string.IsNullOrWhiteSpace(ad))
+                            detay.Ad = ad;
+                    }
+
+                    // ── Ürün Resmi ─────────────────────────────────────────
+                    var resimElemanlari = driver.FindElements(By.CssSelector("picture img"));
+                    foreach (var img in resimElemanlari)
+                    {
+                        var src = img.GetAttribute("src")?.Trim();
+                        if (!string.IsNullOrWhiteSpace(src) && src.StartsWith("https://productimages.hepsiburada"))
+                        {
+                            detay.ResimUrl = src;
+                            break;
+                        }
+                    }
+
+                    // Bulamazsa srcset'ten dene
+                    if (string.IsNullOrEmpty(detay.ResimUrl))
+                    {
+                        var sourceElemanlari = driver.FindElements(By.CssSelector("picture source"));
+                        foreach (var source in sourceElemanlari)
+                        {
+                            var srcset = source.GetAttribute("srcset")?.Trim();
+                            if (!string.IsNullOrWhiteSpace(srcset) && srcset.StartsWith("https://productimages.hepsiburada"))
+                            {
+                                detay.ResimUrl = srcset.Split(' ')[0];
+                                break;
+                            }
+                        }
+                    }
+
+                    // ── Satıcı Adı ─────────────────────────────────────────
+                    var saticiElemanlari = driver.FindElements(By.CssSelector("[data-test-id='buyBox-seller'] a"));
+                    if (saticiElemanlari.Count > 0)
+                    {
+                        var satici = saticiElemanlari[0].GetAttribute("title")?.Trim();
+                        if (string.IsNullOrWhiteSpace(satici))
+                            satici = saticiElemanlari[0].Text?.Trim();
+                        if (!string.IsNullOrWhiteSpace(satici))
+                            detay.Satici = satici;
+                    }
+
+                    return detay;
+>>>>>>> Stashed changes
                 }
             }
 
