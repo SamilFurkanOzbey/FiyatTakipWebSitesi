@@ -62,26 +62,18 @@ public class FiyatGuncellemeJob(
                     _logger.LogDebug("[FiyatGuncellemeJob] Scraping başladı — ürün #{Id}: {Ad}", urun.Id, urun.Ad);
                 }
 
-                var fiyatMetin = await scraperService.GetPriceAsync(urun.URL);
+                var detay = await scraperService.GetUrunDetayAsync(urun.URL);
 
-                // "25.649,05 TL" → decimal parse
-                var temiz = fiyatMetin
-                    .Replace("TL", "")
-                    .Replace(".", "")
-                    .Replace(",", ".")
-                    .Trim();
-
-                if (!decimal.TryParse(temiz,
-                        System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        out decimal yeniFiyat))
+                if (detay.FiyatSayi <= 0)
                 {
                     _logger.LogWarning(
-                        "[FiyatGuncellemeJob] Fiyat parse edilemedi — ürün #{Id}: '{Ham}'",
-                        urun.Id, fiyatMetin);
+                        "[FiyatGuncellemeJob] Fiyat alınamadı veya sıfır — ürün #{Id}: '{Ham}'",
+                        urun.Id, detay.Fiyat);
                     hatali++;
                     continue;
                 }
+                
+                decimal yeniFiyat = detay.FiyatSayi;
 
                 await urunService.FiyatGuncelleAsync(urun.Id, yeniFiyat, stokVar: true);
 

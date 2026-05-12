@@ -22,6 +22,8 @@ public class Urun
     
     public string? Resim { get; set; }
     
+    public string Satici { get; set; } = string.Empty;
+    
     public int KategoriId { get; set; }
     
     public Kategori? Kategori { get; set; }

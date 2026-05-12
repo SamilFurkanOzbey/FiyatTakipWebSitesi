@@ -1,6 +1,8 @@
-﻿@page "/takip"
+@page "/takip"
 @rendermode InteractiveServer
 @inject ScraperService Scraper
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
+@inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
 
 <h2>⭐ Takip Ettiklerim</h2>
 
@@ -179,8 +181,39 @@ else
     int ilerleme = 0; // 0–100 arası ilerleme çubuğu değeri
 
     // ── Diğer değişkenler ──────────────────────────────────────
+    List<Models.Kategori> dbKategoriler = new();
     List<string> kategoriler = new() { "Telefon", "Bilgisayar", "Elektronik", "Giyim", "Diğer" };
     string secilenKategori   = "Telefon";
+
+    protected override async Task OnInitializedAsync()
+    {
+        dbKategoriler = await KategoriServisi.GetAllAsync();
+        if(dbKategoriler.Count == 0)
+        {
+            await KategoriServisi.SeedVarsayilanKategorilerAsync();
+            dbKategoriler = await KategoriServisi.GetAllAsync();
+        }
+        kategoriler = dbKategoriler.Select(k => k.Ad).ToList();
+        if (kategoriler.Any()) secilenKategori = kategoriler.First();
+        
+        await UrunleriYukle();
+    }
+
+    private async Task UrunleriYukle()
+    {
+        var dbUrunler = await UrunServisi.GetAllAsync();
+        urunler = dbUrunler.Select(u => new TakipUrun
+        {
+            Id = u.Id,
+            Ad = u.Ad,
+            Fiyat = u.SonFiyati.ToString("N2", new System.Globalization.CultureInfo("tr-TR")) + " TL",
+            ResimUrl = u.Resim ?? "",
+            Satici = string.IsNullOrEmpty(u.Satici) ? "Bilinmiyor" : u.Satici,
+            Url = u.URL,
+            Kategori = u.Kategori?.Ad ?? "Diğer"
+        }).ToList();
+    }
+
     string yeniLink          = "";
     string mesaj             = "";
     bool   hataVar           = false;
@@ -190,6 +223,7 @@ else
 
     public class TakipUrun
     {
+        public int Id          { get; set; }
         public string Ad       { get; set; } = "";
         public string Fiyat    { get; set; } = "";
         public string ResimUrl { get; set; } = "";
@@ -263,15 +297,21 @@ else
             StateHasChanged();
             await Task.Delay(400); // kısa bir "tamamlandı" gösterimi
 
-            urunler.Add(new TakipUrun
+            var kat = dbKategoriler.FirstOrDefault(k => k.Ad == secilenKategori) ?? dbKategoriler.FirstOrDefault();
+            
+            var yeniUrun = new Models.Urun
             {
-                Ad       = detay.Ad,
-                Fiyat    = detay.Fiyat,
-                ResimUrl = detay.ResimUrl,
-                Satici   = detay.Satici,
-                Url      = detay.Url,
-                Kategori = secilenKategori
-            });
+                Ad = detay.Ad,
+                URL = detay.Url,
+                Resim = detay.ResimUrl,
+                Satici = detay.Satici,
+                BaslangicFiyati = detay.FiyatSayi,
+                SonFiyati = detay.FiyatSayi,
+                KategoriId = kat?.Id ?? 1,
+            };
+            
+            await UrunServisi.EkleAsync(yeniUrun);
+            await UrunleriYukle();
 
             yeniLink = "";
             mesaj    = $"✅ \"{detay.Ad}\" takip listesine eklendi!";
@@ -288,9 +328,13 @@ else
         }
     }
 
-    void Sil(TakipUrun urun)
+    async Task Sil(TakipUrun urun)
     {
-        urunler.Remove(urun);
+        if (urun.Id > 0)
+        {
+            await UrunServisi.SilAsync(urun.Id);
+        }
+        await UrunleriYukle();
         mesaj   = "Ürün listeden kaldırıldı.";
         hataVar = false;
     }
