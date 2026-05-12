@@ -7,6 +7,7 @@
 // =====================================================
 
 using FiyatTakipWebSitesi.DTOs;
+using FiyatTakipWebSitesi.Mappers;
 using FiyatTakipWebSitesi.Models;
 using FiyatTakipWebSitesi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,7 @@ public class UrunlerController : ControllerBase
 {
     private readonly UrunService _urunService;
     private readonly ILogger<UrunlerController> _logger;
+    private readonly UrunMapper _mapper = new();
 
     public UrunlerController(UrunService urunService, ILogger<UrunlerController> logger)
     {
@@ -48,7 +50,7 @@ public class UrunlerController : ControllerBase
             else
                 urunler = await _urunService.GetAllAsync();
 
-            var response = urunler.Select(MapToResponse);
+            var response = urunler.Select(u => _mapper.UrunToUrunResponse(u));
             return Ok(response);
         }
         catch (Exception ex)
@@ -85,7 +87,7 @@ public class UrunlerController : ControllerBase
             };
 
             var eklendi = await _urunService.EkleAsync(urun);
-            var response = MapToResponse(eklendi);
+            var response = _mapper.UrunToUrunResponse(eklendi);
 
             return CreatedAtAction(nameof(GetById), new { id = eklendi.Id }, response);
         }
@@ -109,7 +111,7 @@ public class UrunlerController : ControllerBase
             if (urun is null)
                 return NotFound(new { hata = $"Id={id} olan ürün bulunamadı." });
 
-            return Ok(MapToResponse(urun));
+            return Ok(_mapper.UrunToUrunResponse(urun));
         }
         catch (Exception ex)
         {
@@ -179,22 +181,5 @@ public class UrunlerController : ControllerBase
     }
 
     // ── Yardımcı Dönüşüm Metodu ───────────────────────
-
-    private static UrunResponse MapToResponse(Urun u) => new()
-    {
-        Id = u.Id,
-        Ad = u.Ad,
-        URL = u.URL,
-        Resim = u.Resim,
-        KategoriId = u.KategoriId,
-        KategoriAdi = u.Kategori?.Ad,
-        BaslangicFiyati = u.BaslangicFiyati,
-        SonFiyati = u.SonFiyati,
-        HedefFiyati = u.HedefFiyati,
-        FiyatDususuBildir = u.FiyatDususuBildir,
-        FiyatArtisiiBildir = u.FiyatArtisiiBildir,
-        Aktif = u.Aktif,
-        EklendigiTarih = u.EklendigiTarih,
-        SonGuncellemeTarihi = u.SonGuncellemeTarihi
-    };
+    // Mapperly kullanıldığı için artık manuel mapping'e gerek yoktur.
 }

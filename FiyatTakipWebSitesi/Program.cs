@@ -51,10 +51,14 @@ builder.Services.AddScoped<KullaniciService>();
 builder.Services.AddScoped<UyariService>();
 builder.Services.AddTransient<FiyatGuncellemeJob>();
 
+// ── Options Pattern ───────────────────────────────────────────────────────────
+builder.Services.Configure<FiyatTakipWebSitesi.Models.JwtSettings>(builder.Configuration.GetSection("Jwt"));
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<FiyatTakipWebSitesi.Models.JwtSettings>() ?? new();
+
 // ── Authentication & Authorization ────────────────────────────────────────────
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "FiyatTakipGizliAnahtar2026!XyZ#AbC$DeF%GhI&JkL";
-var issuer = builder.Configuration["Jwt:Issuer"] ?? "FiyatTakipWebSitesi";
-var audience = builder.Configuration["Jwt:Audience"] ?? "FiyatTakipKullanicilari";
+var jwtKey = jwtSettings.Key;
+var issuer = jwtSettings.Issuer;
+var audience = jwtSettings.Audience;
 
 builder.Services.AddAuthentication(options =>
 {
@@ -107,10 +111,11 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 // ── Hangfire Dashboard ────────────────────────────────────────────────────────
-// Sadece geliştirme ortamında herkese açık; production'da yetkilendirme ekleyin
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
-    Authorization = [] // Geliştirme: yetkisiz erişime izin ver
+    Authorization = app.Environment.IsDevelopment() 
+        ? [] // Geliştirme ortamında herkese açık
+        : [new FiyatTakipWebSitesi.Filters.HangfireAuthorizationFilter()] // Canlı ortamda kimlik doğrulaması gerektir
 });
 
 // ── Periyodik Job Kayıtları ───────────────────────────────────────────────────

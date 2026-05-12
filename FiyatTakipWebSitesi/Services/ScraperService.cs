@@ -229,6 +229,22 @@ public class ScraperService
                 "  Şüpheli      : {Supheli}",
                 url, baslik, uzunluk, jsonLdVar, itemPropVar, sepetOzelVar,
                 supheli.Count > 0 ? string.Join(", ", supheli) : "yok");
+
+            var logDir = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+            if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+            
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var dosyaAdiBase = $"error_{timestamp}_{Guid.NewGuid().ToString().Substring(0,4)}";
+            
+            File.WriteAllText(Path.Combine(logDir, $"{dosyaAdiBase}.html"), pageSource);
+            
+            if (driver is ITakesScreenshot ts)
+            {
+                var screenshot = ts.GetScreenshot();
+                screenshot.SaveAsFile(Path.Combine(logDir, $"{dosyaAdiBase}.png"));
+            }
+            
+            _logger.LogWarning("[TEŞHİS] Ekran görüntüsü ve HTML '{Dir}' klasörüne kaydedildi. ({Base})", logDir, dosyaAdiBase);
         }
         catch (Exception ex)
         {
@@ -564,7 +580,9 @@ public class ScraperService
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
 
-        var matches = Regex.Matches(text, @"(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*TL",
+        // Daha esnek Regex: 1.250,00 TL, 1250 TL, 1.250 veya sadece 1250 gibi sayısal formatları bulur.
+        // Fiyat etiketleri içindeki (TL, ₺, TRY olsun veya olmasın) geçerli tutarları yakalar.
+        var matches = Regex.Matches(text, @"(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)(?:\s*(?:TL|₺|TRY))?",
             RegexOptions.IgnoreCase);
 
         var fiyatlar = new List<decimal>();

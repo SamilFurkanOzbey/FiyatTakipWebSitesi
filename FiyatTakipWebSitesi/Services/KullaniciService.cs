@@ -14,17 +14,18 @@ using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.DTOs;
 using FiyatTakipWebSitesi.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FiyatTakipWebSitesi.Services;
 
 public class KullaniciService(
     ApplicationDbContext context,
-    IConfiguration config,
+    IOptions<JwtSettings> jwtSettings,
     ILogger<KullaniciService> logger)
 {
     private readonly ApplicationDbContext _context = context;
-    private readonly IConfiguration _config = config;
+    private readonly JwtSettings _jwtSettings = jwtSettings.Value;
     private readonly ILogger<KullaniciService> _logger = logger;
 
     // ── Kayıt ────────────────────────────────────────────────
@@ -154,10 +155,10 @@ public class KullaniciService(
 
     private AuthResponse JwtUret(Kullanici kullanici)
     {
-        var jwtKey    = _config["Jwt:Key"]      ?? throw new InvalidOperationException("JWT Key yapılandırılmamış.");
-        var issuer    = _config["Jwt:Issuer"]   ?? "FiyatTakipWebSitesi";
-        var audience  = _config["Jwt:Audience"] ?? "FiyatTakipKullanicilari";
-        var expMinutes = int.TryParse(_config["Jwt:ExpireMinutes"], out var m) ? m : 1440;
+        var jwtKey    = _jwtSettings.Key;
+        var issuer    = _jwtSettings.Issuer;
+        var audience  = _jwtSettings.Audience;
+        var expMinutes = _jwtSettings.ExpireMinutes;
 
         var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);

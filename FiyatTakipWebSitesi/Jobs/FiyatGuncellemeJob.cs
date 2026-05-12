@@ -11,6 +11,7 @@
 using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.Services;
 using Microsoft.EntityFrameworkCore;
+using Polly;
 
 namespace FiyatTakipWebSitesi.Jobs;
 
@@ -62,7 +63,17 @@ public class FiyatGuncellemeJob(
                     _logger.LogDebug("[FiyatGuncellemeJob] Scraping başladı — ürün #{Id}: {Ad}", urun.Id, urun.Ad);
                 }
 
-                var detay = await scraperService.GetUrunDetayAsync(urun.URL);
+                var retryPolicy = Policy
+                    .Handle<Exception>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.LogWarning(
+                            "[FiyatGuncellemeJob] Scraping hatası, tekrar deneniyor ({RetryCount}/3) — ürün #{Id}. Hata: {Mesaj}",
+                            retryCount, urun.Id, exception.Message);
+                    });
+
+                var detay = await retryPolicy.ExecuteAsync(async () => await scraperService.GetUrunDetayAsync(urun.URL));
 
                 if (detay.FiyatSayi <= 0)
                 {

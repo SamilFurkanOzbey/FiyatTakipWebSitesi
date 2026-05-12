@@ -20,6 +20,8 @@ public class FiyatGecmisi
     
     public decimal Fiyat { get; set; }
     
+    public string ParaBirimi { get; set; } = "TRY";
+    
     public DateTime Tarih { get; set; } = DateTime.UtcNow;
     
     public decimal? OncekiFiyat { get; set; }

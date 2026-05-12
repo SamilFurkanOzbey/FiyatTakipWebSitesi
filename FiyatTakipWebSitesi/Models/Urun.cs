@@ -24,6 +24,8 @@ public class Urun
     
     public string Satici { get; set; } = string.Empty;
     
+    public string ParaBirimi { get; set; } = "TRY";
+    
     public int KategoriId { get; set; }
     
     public Kategori? Kategori { get; set; }

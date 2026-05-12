@@ -206,7 +206,7 @@ else
         {
             Id = u.Id,
             Ad = u.Ad,
-            Fiyat = u.SonFiyati.ToString("N2", new System.Globalization.CultureInfo("tr-TR")) + " TL",
+            Fiyat = u.SonFiyati.ToString("N2", new System.Globalization.CultureInfo("tr-TR")) + " " + u.ParaBirimi,
             ResimUrl = u.Resim ?? "",
             Satici = string.IsNullOrEmpty(u.Satici) ? "Bilinmiyor" : u.Satici,
             Url = u.URL,
@@ -307,6 +307,7 @@ else
                 Satici = detay.Satici,
                 BaslangicFiyati = detay.FiyatSayi,
                 SonFiyati = detay.FiyatSayi,
+                ParaBirimi = "TRY",
                 KategoriId = kat?.Id ?? 1,
             };
             
