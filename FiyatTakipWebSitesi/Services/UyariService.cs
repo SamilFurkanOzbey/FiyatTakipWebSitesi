@@ -12,16 +12,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class UyariService
+public class UyariService(ApplicationDbContext context, ILogger<UyariService> logger)
 {
-    private readonly ApplicationDbContext _context;
-    private readonly ILogger<UyariService> _logger;
-
-    public UyariService(ApplicationDbContext context, ILogger<UyariService> logger)
-    {
-        _context = context;
-        _logger  = logger;
-    }
+    private readonly ApplicationDbContext _context = context;
+    private readonly ILogger<UyariService> _logger = logger;
 
     // ── Uyarı Oluşturma ──────────────────────────────────────
 
@@ -49,9 +43,12 @@ public class UyariService
         _context.Uyarilar.Add(uyari);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation(
-            "[UyariService] Uyarı oluşturuldu — Kullanıcı: {UserId}, Ürün: {UrunId}, Tip: {Tip}",
-            userId, urunId, tip);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[UyariService] Uyarı oluşturuldu — Kullanıcı: {UserId}, Ürün: {UrunId}, Tip: {Tip}",
+                userId, urunId, tip);
+        }
 
         return uyari;
     }
@@ -134,6 +131,7 @@ public class UyariService
     public async Task<List<Uyari>> GetByKullaniciAsync(int kullaniciId, bool? sadeceokunmamis = null)
     {
         var query = _context.Uyarilar
+            .AsNoTracking()
             .Include(u => u.Urun)
             .Where(u => u.UserId == kullaniciId);
 

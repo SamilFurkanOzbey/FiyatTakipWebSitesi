@@ -14,23 +14,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class KategoriService
+public class KategoriService(ApplicationDbContext context)
 {
-    private readonly ApplicationDbContext _context;
-
-    public KategoriService(ApplicationDbContext context)
-    {
-        _context = context;
-    }
+    private readonly ApplicationDbContext _context = context;
 
     public async Task<List<Kategori>> GetAllAsync()
         => await _context.Kategoriler
+            .AsNoTracking()
             .Include(k => k.Urunler)
             .OrderBy(k => k.Ad)
             .ToListAsync();
 
     public async Task<Kategori?> GetByIdAsync(int id)
         => await _context.Kategoriler
+            .AsNoTracking()
             .Include(k => k.Urunler.Where(u => u.Aktif))
             .FirstOrDefaultAsync(k => k.Id == id);
 

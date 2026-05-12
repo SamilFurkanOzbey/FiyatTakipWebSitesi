@@ -14,26 +14,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class UrunService
+public class UrunService(
+    ApplicationDbContext context,
+    UyariService uyariService,
+    FiyatGecmisiService fiyatGecmisiService)
 {
-    private readonly ApplicationDbContext _context;
-    private readonly UyariService _uyariService;
-    private readonly FiyatGecmisiService _fiyatGecmisiService;
-
-    public UrunService(
-        ApplicationDbContext context,
-        UyariService uyariService,
-        FiyatGecmisiService fiyatGecmisiService)
-    {
-        _context             = context;
-        _uyariService        = uyariService;
-        _fiyatGecmisiService = fiyatGecmisiService;
-    }
+    private readonly ApplicationDbContext _context = context;
+    private readonly UyariService _uyariService = uyariService;
+    private readonly FiyatGecmisiService _fiyatGecmisiService = fiyatGecmisiService;
 
     // --- Okuma ---
 
     public async Task<List<Urun>> GetAllAsync()
         => await _context.Urunler
+            .AsNoTracking()
             .Include(u => u.Kategori)
             .Include(u => u.Kullanici)
             .OrderByDescending(u => u.EklendigiTarih)
@@ -41,6 +35,7 @@ public class UrunService
 
     public async Task<Urun?> GetByIdAsync(int id)
         => await _context.Urunler
+            .AsNoTracking()
             .Include(u => u.Kategori)
             .Include(u => u.FiyatGecmisleri.OrderByDescending(fg => fg.Tarih).Take(30))
             .Include(u => u.Uyarilar)
@@ -48,6 +43,7 @@ public class UrunService
 
     public async Task<List<Urun>> GetByKategoriAsync(int kategoriId)
         => await _context.Urunler
+            .AsNoTracking()
             .Include(u => u.Kategori)
             .Where(u => u.KategoriId == kategoriId && u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)
@@ -55,6 +51,7 @@ public class UrunService
 
     public async Task<List<Urun>> GetByKullaniciAsync(int kullaniciId)
         => await _context.Urunler
+            .AsNoTracking()
             .Include(u => u.Kategori)
             .Where(u => u.UserId == kullaniciId && u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)

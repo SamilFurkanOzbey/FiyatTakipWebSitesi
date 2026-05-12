@@ -14,19 +14,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class FiyatGecmisiService
+public class FiyatGecmisiService(ApplicationDbContext context)
 {
-    private readonly ApplicationDbContext _context;
-
-    public FiyatGecmisiService(ApplicationDbContext context)
-    {
-        _context = context;
-    }
+    private readonly ApplicationDbContext _context = context;
 
     /// <summary>Bir ürünün tüm fiyat geçmişini getirir (en yeniden eskiye)</summary>
     public async Task<List<FiyatGecmisi>> GetByUrunAsync(int urunId, int? limit = null)
     {
         var query = _context.FiyatGecmisleri
+            .AsNoTracking()
             .Where(fg => fg.UrunId == urunId)
             .OrderByDescending(fg => fg.Tarih);
 
@@ -38,6 +34,7 @@ public class FiyatGecmisiService
     /// <summary>Tarih aralığına göre fiyat geçmişi</summary>
     public async Task<List<FiyatGecmisi>> GetByDateRangeAsync(int urunId, DateTime baslangic, DateTime bitis)
         => await _context.FiyatGecmisleri
+            .AsNoTracking()
             .Where(fg => fg.UrunId == urunId && fg.Tarih >= baslangic && fg.Tarih <= bitis)
             .OrderBy(fg => fg.Tarih)
             .ToListAsync();
@@ -50,7 +47,7 @@ public class FiyatGecmisiService
             .Select(fg => fg.Fiyat)
             .ToListAsync();
 
-        if (!fiyatlar.Any()) return (0, 0);
+        if (fiyatlar.Count == 0) return (0, 0);
         return (fiyatlar.Min(), fiyatlar.Max());
     }
 
@@ -63,7 +60,7 @@ public class FiyatGecmisiService
             .Select(fg => fg.Fiyat)
             .ToListAsync();
 
-        return fiyatlar.Any() ? fiyatlar.Average() : 0;
+        return fiyatlar.Count > 0 ? fiyatlar.Average() : 0;
     }
 
     /// <summary>Son 30 gün içinde en düşük fiyatı yakalamışsa true döner</summary>

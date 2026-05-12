@@ -14,18 +14,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Jobs;
 
-public class FiyatGuncellemeJob
+public class FiyatGuncellemeJob(
+    IServiceScopeFactory scopeFactory,
+    ILogger<FiyatGuncellemeJob> logger)
 {
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<FiyatGuncellemeJob> _logger;
-
-    public FiyatGuncellemeJob(
-        IServiceScopeFactory scopeFactory,
-        ILogger<FiyatGuncellemeJob> logger)
-    {
-        _scopeFactory = scopeFactory;
-        _logger = logger;
-    }
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly ILogger<FiyatGuncellemeJob> _logger = logger;
 
     /// <summary>
     /// Tüm aktif ürünlerin fiyatlarını sırasıyla scrape eder ve
@@ -34,7 +28,10 @@ public class FiyatGuncellemeJob
     /// </summary>
     public async Task TumUrunlerGuncelleAsync()
     {
-        _logger.LogInformation("[FiyatGuncellemeJob] Periyodik fiyat güncelleme başladı — {Zaman}", DateTime.Now);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("[FiyatGuncellemeJob] Periyodik fiyat güncelleme başladı — {Zaman}", DateTime.Now);
+        }
 
         // Her job çağrısında yeni bir DI scope aç
         // (Scoped servisler: DbContext, UrunService, ScraperService)
@@ -49,7 +46,10 @@ public class FiyatGuncellemeJob
             .Where(u => u.Aktif && !string.IsNullOrEmpty(u.URL))
             .ToListAsync();
 
-        _logger.LogInformation("[FiyatGuncellemeJob] {Adet} aktif ürün bulundu.", urunler.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("[FiyatGuncellemeJob] {Adet} aktif ürün bulundu.", urunler.Count);
+        }
 
         int basarili = 0, hatali = 0;
 
@@ -57,7 +57,10 @@ public class FiyatGuncellemeJob
         {
             try
             {
-                _logger.LogDebug("[FiyatGuncellemeJob] Scraping başladı — ürün #{Id}: {Ad}", urun.Id, urun.Ad);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("[FiyatGuncellemeJob] Scraping başladı — ürün #{Id}: {Ad}", urun.Id, urun.Ad);
+                }
 
                 var fiyatMetin = await scraperService.GetPriceAsync(urun.URL);
 
@@ -82,9 +85,12 @@ public class FiyatGuncellemeJob
 
                 await urunService.FiyatGuncelleAsync(urun.Id, yeniFiyat, stokVar: true);
 
-                _logger.LogInformation(
-                    "[FiyatGuncellemeJob] ✓ Ürün #{Id} güncellendi — Yeni fiyat: {Fiyat:N2} TL",
-                    urun.Id, yeniFiyat);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation(
+                        "[FiyatGuncellemeJob] ✓ Ürün #{Id} güncellendi — Yeni fiyat: {Fiyat:N2} TL",
+                        urun.Id, yeniFiyat);
+                }
                 basarili++;
             }
             catch (Exception ex)
@@ -97,8 +103,11 @@ public class FiyatGuncellemeJob
             }
         }
 
-        _logger.LogInformation(
-            "[FiyatGuncellemeJob] Tamamlandı — Başarılı: {Basarili}, Hatalı: {Hatali}, Toplam: {Toplam}",
-            basarili, hatali, urunler.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[FiyatGuncellemeJob] Tamamlandı — Başarılı: {Basarili}, Hatalı: {Hatali}, Toplam: {Toplam}",
+                basarili, hatali, urunler.Count);
+        }
     }
 }

@@ -12,18 +12,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-    {
-    }
-
     // Veritabanındaki tabloları temsil eden DbSet'ler
-    public DbSet<Kullanici> Kullanicilar { get; set; }
-    public DbSet<Kategori> Kategoriler { get; set; }
-    public DbSet<Urun> Urunler { get; set; }
-    public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; }
-    public DbSet<Uyari> Uyarilar { get; set; }
+    public DbSet<Kullanici> Kullanicilar { get; set; } = null!;
+    public DbSet<Kategori> Kategoriler { get; set; } = null!;
+    public DbSet<Urun> Urunler { get; set; } = null!;
+    public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; } = null!;
+    public DbSet<Uyari> Uyarilar { get; set; } = null!;
 
     // Tablo ilişkilerini, kısıtlamaları ve index'leri burada yapılandırıyoruz
     protected override void OnModelCreating(ModelBuilder modelBuilder)
