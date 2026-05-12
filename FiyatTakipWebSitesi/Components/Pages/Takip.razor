@@ -58,7 +58,6 @@
                         { <span class="nokta-animasyon">⚙️</span> }
                         else
                         {
-
                             <span style="opacity:0.3">○</span>
                         }
                     </span>
@@ -93,14 +92,14 @@
 
 @if (!urunler.Any())
 {
-    <p style="color:#94a3b8;">Henüz takip edilen ürün yok. Yukarıdan bir Hepsiburada linki ekle.</p>
+    <p style="color:#94a3b8;">Henüz takip edilen ürün yok. Yukarıdan bir link ekle.</p>
 }
 else
 {
     <div style="display:flex; gap:20px; flex-wrap:wrap;">
         @foreach (var urun in urunler)
         {
-            <div class="card" style="width:220px; background:#1e293b; border:1px solid #334155; border-radius:12px; overflow:hidden; color:white;">
+            <div class="card" style="width:240px; background:#1e293b; border:1px solid #334155; border-radius:14px; overflow:hidden; color:white; display:flex; flex-direction:column; justify-content:space-between;">
                 @if (!string.IsNullOrEmpty(urun.ResimUrl))
                 {
                     <img src="@urun.ResimUrl" alt="@urun.Ad"
@@ -108,30 +107,32 @@ else
                 }
                 else
                 {
-                    <div style="width:100%; height:160px; background:#2a2a4a; display:flex; align-items:center; justify-content:center; font-size:2.5rem;">🖼️</div>
+                    <div style="width:100%; height:160px; background:#0f172a; display:flex; align-items:center; justify-content:center; font-size:2.5rem;">🖼️</div>
                 }
-                <div class="card-body" style="padding:12px;">
-                    <p style="font-size:0.8rem; color:#cbd5e1; margin:0 0 6px; line-height:1.4;
-                               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                        @urun.Ad
-                    </p>
-                    <p style="font-size:1.1rem; font-weight:700; color:#38bdf8; margin:0 0 4px;">
-                        @urun.Fiyat
-                    </p>
-                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 10px;">
-                        🏪 @urun.Satici
-                    </p>
-                    <span class="badge bg-secondary" style="margin-bottom:10px;">@urun.Kategori</span>
-                    <div style="display:flex; gap:6px; margin-top:8px;">
-                        <a href="@urun.Url" target="_blank"
-                           style="flex:1; text-align:center; padding:6px; background:#475569; border-radius:6px;
-                                  text-decoration:none; color:white; font-size:0.75rem;">
-                            🔗 Git
-                        </a>
-                        <button class="btn btn-sm btn-danger" style="flex:1; font-size:0.75rem;"
-                                @onclick="() => Sil(urun)">
-                            🗑️ Sil
-                        </button>
+                <div class="card-body" style="padding:14px; display:flex; flex-direction:column; flex:1; justify-content:space-between;">
+                    <div>
+                        <p style="font-size:0.85rem; color:#cbd5e1; margin:0 0 8px; font-weight:600; line-height:1.3;
+                                   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                            @urun.Ad
+                        </p>
+                        <p style="font-size:1.2rem; font-weight:700; color:#38bdf8; margin:0 0 4px;">
+                            @urun.Fiyat
+                        </p>
+                        <p style="font-size:0.75rem; color:#94a3b8; margin:0 0 10px;">
+                            🏪 @urun.Satici
+                        </p>
+                    </div>
+
+                    <div>
+                        <span class="badge bg-secondary" style="margin-bottom:12px; display:inline-block;">@urun.Kategori</span>
+                        
+                        <!-- ENTEGRE EDİLMİŞ BUTONLAR GRUBU -->
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                            <NavLink href="@($"/urundetay/{urun.Id}")" class="btn-takip-koyu">📄 Detay</NavLink>
+                            <NavLink href="@($"/grafik/{urun.Id}")" class="btn-takip-mavi">📊 Grafik</NavLink>
+                            <a href="@urun.Url" target="_blank" class="btn-takip-koyu">🔗 Git</a>
+                            <button class="btn-takip-kirmizi" @onclick="() => Sil(urun)">🗑️ Sil</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -155,6 +156,26 @@ else
     .nokta-animasyon {
         display: inline-block;
         animation: don 1.2s linear infinite;
+    }
+
+    .btn-takip-koyu, .btn-takip-mavi, .btn-takip-kirmizi {
+        text-align: center;
+        padding: 6px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: filter 0.2s;
+    }
+    .btn-takip-koyu { background: #475569; color: white; }
+    .btn-takip-mavi { background: #0284c7; color: white; }
+    .btn-takip-kirmizi { background: #dc2626; color: white; }
+    
+    .btn-takip-koyu:hover, .btn-takip-mavi:hover, .btn-takip-kirmizi:hover {
+        filter: brightness(1.15);
+        color: white;
     }
 </style>
 

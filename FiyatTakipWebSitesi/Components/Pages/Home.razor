@@ -1,5 +1,7 @@
-﻿@page "/"
+@page "/"
 @rendermode InteractiveServer
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
+@inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
 <PageTitle>Ana Sayfa</PageTitle>
 
 <div class="home-container">
@@ -9,152 +11,153 @@
         <p>Ürünleri incele ve fiyat geçmişlerini takip et.</p>
     </div>
 
-    <NavLink href="/kategoriler" class="tum-kategori-btn">
-        Tüm Kategoriler Sayfasına Git
+    <NavLink href="/takip" class="tum-kategori-btn">
+        ⭐ Takip Ettiklerim Sayfasına Git
     </NavLink>
 
     <div class="kategori-row">
         @foreach (var kategori in kategoriler)
         {
-            <button class="kategori-btn @(secilenKategori == kategori ? "active" : "")"
+            <button class="kategori-btn @(secilenKategori?.Id == kategori.Id ? "active" : "")"
                     @onclick="() => KategoriToggle(kategori)">
-                @kategori @(secilenKategori == kategori ? "▲" : "▼")
+                @kategori.Ad @(secilenKategori?.Id == kategori.Id ? "▲" : "▼")
             </button>
         }
     </div>
 
-    @if (!string.IsNullOrEmpty(secilenKategori) && gosterilenUrunler.Any())
+    @if (secilenKategori != null && gosterilenUrunler.Any())
     {
         <div class="urun-grid">
             @foreach (var urun in gosterilenUrunler)
             {
                 <div class="urun-card">
-                    <img src="@urun.Resim" alt="@urun.Ad" />
+                    @if (!string.IsNullOrEmpty(urun.Resim))
+                    {
+                        <img src="@urun.Resim" alt="@urun.Ad" />
+                    }
+                    else
+                    {
+                        <div class="resim-placeholder">🖼️</div>
+                    }
                     <h4>@urun.Ad</h4>
-                    <p class="fiyat">@urun.Fiyat</p>
+                    <p class="fiyat">@urun.SonFiyati.ToString("N2") @urun.ParaBirimi</p>
+                    <p class="satici">🏪 @(string.IsNullOrEmpty(urun.Satici) ? "Bilinmiyor" : urun.Satici)</p>
 
                     <div class="btn-row">
-                        <NavLink href="/UrunDetaySayfasi" class="detay-btn">Detay</NavLink>
-                        <NavLink href="/Analiz" class="grafik-btn">Grafik</NavLink>
+                        <NavLink href="@($"/urundetay/{urun.Id}")" class="detay-btn">Detay</NavLink>
+                        <NavLink href="@($"/grafik/{urun.Id}")" class="grafik-btn">Grafik</NavLink>
                     </div>
                 </div>
             }
         </div>
     }
-    else if (!string.IsNullOrEmpty(secilenKategori))
+    else if (secilenKategori != null)
     {
         <div class="bos-uyari">
-            <p>Bu kategoriye ait örnek ürünler henüz eklenmedi. (Şimdilik sadece Elektronik ve Moda dolu)</p>
+            <p>Bu kategoriye ait henüz takip edilen bir ürün bulunmuyor.</p>
+            <NavLink href="/takip" class="ekle-link">Hemen Ürün Ekle</NavLink>
+        </div>
+    }
+    else
+    {
+        <div class="bos-uyari">
+            <p>👆 Ürünlerini görmek için yukarıdan bir kategori seçin.</p>
         </div>
     }
 
 </div>
 
 <style>
-    body { background: #0f172a; color: white; font-family: 'Segoe UI'; }
-    .home-container { padding: 30px; }
-    .hero h1 { font-size: 42px; font-weight: bold; }
-    .hero p { color: #94a3b8; margin-bottom: 20px; }
+    body { background: #0f172a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .home-container { padding: 30px; max-width: 1400px; margin: 0 auto; }
+    .hero h1 { font-size: 42px; font-weight: bold; background: linear-gradient(90deg, #38bdf8, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { color: #94a3b8; margin-bottom: 20px; font-size: 1.1rem; }
     
     .tum-kategori-btn { 
         display: inline-block; 
         background: #1e293b; 
         color: #38bdf8; 
         text-decoration: none; 
-        padding: 10px 20px; 
+        padding: 12px 24px; 
         border: 1px solid #38bdf8;
-        border-radius: 10px; 
+        border-radius: 12px; 
         margin-bottom: 30px;
-        transition: 0.3s;
+        font-weight: 600;
+        transition: all 0.3s ease;
     }
-    .tum-kategori-btn:hover { background: #38bdf8; color: #0f172a; }
+    .tum-kategori-btn:hover { background: #38bdf8; color: #0f172a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2); }
 
     .kategori-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 30px; }
     
     .kategori-btn { 
         background: #1e293b; 
-        color: white; 
-        border: 2px solid #334155; 
-        padding: 15px 25px; 
-        border-radius: 14px; 
+        color: #cbd5e1; 
+        border: 1px solid #334155; 
+        padding: 12px 22px; 
+        border-radius: 12px; 
         cursor: pointer; 
-        font-size: 16px;
-        font-weight: 500;
-        transition: 0.3s;
+        font-size: 15px;
+        font-weight: 600;
+        transition: all 0.3s ease;
     }
-    .kategori-btn:hover { border-color: #38bdf8; }
-    .kategori-btn.active { background: #0284c7; border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
+    .kategori-btn:hover { border-color: #64748b; color: white; }
+    .kategori-btn.active { background: #0284c7; color: white; border-color: #38bdf8; box-shadow: 0 0 15px rgba(2, 132, 199, 0.4); }
 
-    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; animation: fadeIn 0.5s; }
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; animation: fadeIn 0.4s ease-out; }
     
     @@keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
-    .urun-card { background: #1e293b; padding: 15px; border-radius: 18px; border: 1px solid #334155; }
-    .urun-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; }
-    .fiyat { color: #38bdf8; font-weight: bold; font-size: 1.2rem; }
-    .btn-row { display: flex; gap: 10px; margin-top: 15px; }
-    .detay-btn { background: #475569; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
-    .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
-    .bos-uyari { padding: 30px; text-align: center; background: #1e293b; border-radius: 15px; color: #94a3b8; }
+    .urun-card { background: #1e293b; padding: 18px; border-radius: 18px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
+    .urun-card:hover { transform: translateY(-4px); border-color: #475569; }
+    .urun-card img { width: 100%; height: 180px; object-fit: contain; background: white; border-radius: 12px; padding: 10px; margin-bottom: 12px; }
+    .resim-placeholder { width: 100%; height: 180px; background: #0f172a; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin-bottom: 12px; }
+    .urun-card h4 { font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .fiyat { color: #38bdf8; font-weight: 700; font-size: 1.25rem; margin-bottom: 4px; }
+    .satici { font-size: 0.8rem; color: #94a3b8; margin-bottom: 16px; }
+    
+    .btn-row { display: flex; gap: 10px; margin-top: auto; }
+    .detay-btn { background: #475569; flex: 1; text-align: center; padding: 10px; border-radius: 10px; text-decoration: none; color: white; font-weight: 600; font-size: 0.9rem; transition: background 0.2s; }
+    .detay-btn:hover { background: #64748b; color: white; }
+    .grafik-btn { background: #0284c7; flex: 1; text-align: center; padding: 10px; border-radius: 10px; text-decoration: none; color: white; font-weight: 600; font-size: 0.9rem; transition: background 0.2s; }
+    .grafik-btn:hover { background: #0369a1; color: white; }
+    
+    .bos-uyari { padding: 40px; text-align: center; background: #1e293b; border-radius: 16px; border: 1px dashed #475569; color: #94a3b8; animation: fadeIn 0.3s; }
+    .ekle-link { display: inline-block; margin-top: 12px; color: #38bdf8; text-decoration: none; font-weight: 600; }
+    .ekle-link:hover { text-decoration: underline; }
 </style>
 
 @code {
-    List<string> kategoriler = new() { "Elektronik", "Moda", "Ev", "Spor", "Kitap", "Kozmetik" };
-    List<Urun> tumUrunler = new();
-    List<Urun> gosterilenUrunler = new();
-    string secilenKategori = "";
+    List<FiyatTakipWebSitesi.Models.Kategori> kategoriler = new();
+    List<FiyatTakipWebSitesi.Models.Urun> tumUrunler = new();
+    List<FiyatTakipWebSitesi.Models.Urun> gosterilenUrunler = new();
+    FiyatTakipWebSitesi.Models.Kategori? secilenKategori = null;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        UrunleriYukle();
-    }
+        kategoriler = await KategoriServisi.GetAllAsync();
+        tumUrunler = await UrunServisi.GetAllAsync();
 
-    void UrunleriYukle()
-    {
-        string[] elektronikler = { "iPhone 15", "MacBook Air", "Sony WH-1000XM5", "Logitech G502", "Razer BlackWidow", "Samsung Odyssey G7", "iPad Pro", "Apple Watch S9", "Samsung T7 SSD", "Logitech C920", "JBL Flip 6", "Meta Quest 3" };
-        string[] modalar = { "Siyah Trençkot", "Oversize Hoodie", "Air Jordan 1", "Basic Beyaz Tişört", "Slim Fit Gömlek", "Chelsea Bot", "Ray-Ban Wayfarer", "North Face Çanta", "V Yaka Kazak", "Chino Pantolon", "Gece Elbisesi", "Kolombiya Mont" };
-
-        for (int i = 0; i < 12; i++)
+        // Varsayılan olarak ilk kategoriyi seçili yapalım
+        if (kategoriler.Any())
         {
-            // Elektronik Ekle
-            tumUrunler.Add(new Urun {
-                Ad = elektronikler[i],
-                Fiyat = $"{new Random().Next(3000, 60000)} TL",
-                Kategori = "Elektronik",
-                Resim = $"https://picsum.photos/400/300?random=e{i}"
-            });
-
-            // Moda Ekle
-            tumUrunler.Add(new Urun {
-                Ad = modalar[i],
-                Fiyat = $"{new Random().Next(500, 8000)} TL",
-                Kategori = "Moda",
-                Resim = $"https://picsum.photos/400/600?random=m{i}"
-            });
+            KategoriToggle(kategoriler.First());
         }
     }
 
-    void KategoriToggle(string kategori)
+    void KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
     {
-        if (secilenKategori == kategori)
+        if (secilenKategori?.Id == kategori.Id)
         {
-            secilenKategori = ""; // Aynı kategoriye basılırsa kapat
+            secilenKategori = null;
             gosterilenUrunler.Clear();
         }
         else
         {
             secilenKategori = kategori;
-            gosterilenUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
+            gosterilenUrunler = tumUrunler.Where(x => x.KategoriId == kategori.Id && x.Aktif).ToList();
         }
-    }
-
-    class Urun {
-        public string Ad { get; set; } = "";
-        public string Fiyat { get; set; } = "";
-        public string Kategori { get; set; } = "";
-        public string Resim { get; set; } = "";
     }
 }

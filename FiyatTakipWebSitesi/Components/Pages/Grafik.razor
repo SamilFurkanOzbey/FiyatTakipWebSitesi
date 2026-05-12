@@ -1,76 +1,241 @@
-﻿@page "/grafik"
+@page "/grafik/{Id:int}"
 @rendermode InteractiveServer
-<PageTitle>Analiz</PageTitle>
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
+@inject FiyatTakipWebSitesi.Services.FiyatGecmisiService FiyatGecmisiServisi
+<PageTitle>Fiyat Grafiği ve Analiz</PageTitle>
 
 <div class="grafik-page">
 
-    ```
-    <h1>📊 Fiyat Analizi</h1>
-
-    <div class="grafik-card">
-
-        <h4>iPhone 15 Pro Max</h4>
-
-        <p class="fiyat">Güncel Fiyat: 89.999 TL</p>
-
-        <div class="fake-chart">
-
-            <div class="bar" style="height:40%"></div>
-            <div class="bar" style="height:65%"></div>
-            <div class="bar" style="height:50%"></div>
-            <div class="bar" style="height:90%"></div>
-            <div class="bar" style="height:70%"></div>
-
+    @if (urun == null)
+    {
+        @if (yukleniyor)
+        {
+            <div class="loading-box">
+                <div class="spinner"></div>
+                <p>Grafik verileri yükleniyor...</p>
+            </div>
+        }
+        else
+        {
+            <div class="hata-box">
+                <h2>Ürün Bulunamadı</h2>
+                <p>İstatistiklerini görüntülemek istediğiniz ürün sistemde bulunmuyor.</p>
+                <NavLink href="/" class="btn-geri">🏠 Ana Sayfaya Dön</NavLink>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="baslik-row">
+            <NavLink href="@($"/urundetay/{urun.Id}")" class="geri-link">← Ürün Detayına Dön</NavLink>
+            <span class="kategori-badge">@urun.Kategori?.Ad</span>
         </div>
 
-        <p class="aciklama">
-            Son 30 gündeki fiyat değişimi örneği.
-        </p>
+        <div class="urun-mini-header">
+            <div class="header-sol">
+                @if (!string.IsNullOrEmpty(urun.Resim))
+                {
+                    <img src="@urun.Resim" class="mini-gorsel" />
+                }
+                else
+                {
+                    <span class="mini-placeholder">🖼️</span>
+                }
+                <div>
+                    <h1>@urun.Ad</h1>
+                    <p class="satici">🏪 @(string.IsNullOrEmpty(urun.Satici) ? "Bilinmiyor" : urun.Satici)</p>
+                </div>
+            </div>
+            <div class="header-sag">
+                <span class="fiyat-etiket">Güncel Fiyat</span>
+                <span class="fiyat-deger">@urun.SonFiyati.ToString("N2") @urun.ParaBirimi</span>
+            </div>
+        </div>
 
-    </div>
-    ```
+        <!-- İSTATİSTİK KARTLARI -->
+        <div class="istatistik-grid">
+            <div class="istatistik-card">
+                <div class="ikon-kutu min">📉</div>
+                <div class="veri-kutu">
+                    <span class="baslik">En Düşük Fiyat</span>
+                    <span class="deger text-success">@minFiyat.ToString("N2") @urun.ParaBirimi</span>
+                </div>
+            </div>
+
+            <div class="istatistik-card">
+                <div class="ikon-kutu max">📈</div>
+                <div class="veri-kutu">
+                    <span class="baslik">En Yüksek Fiyat</span>
+                    <span class="deger text-danger">@maxFiyat.ToString("N2") @urun.ParaBirimi</span>
+                </div>
+            </div>
+
+            <div class="istatistik-card">
+                <div class="ikon-kutu ort">📊</div>
+                <div class="veri-kutu">
+                    <span class="baslik">Son 30 Gün Ortalama</span>
+                    <span class="deger text-info">@ortalamaFiyat.ToString("N2") @urun.ParaBirimi</span>
+                </div>
+            </div>
+
+            <div class="istatistik-card">
+                <div class="ikon-kutu fark">🔄</div>
+                <div class="veri-kutu">
+                    <span class="baslik">Toplam Fiyat Değişimi</span>
+                    <span class="deger @(toplamFark < 0 ? "text-success" : (toplamFark > 0 ? "text-danger" : "text-muted"))">
+                        @(toplamFark > 0 ? "+" : "")@toplamFark.ToString("N2") @urun.ParaBirimi
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- GRAFİK KARTI -->
+        <div class="grafik-card">
+            <div class="grafik-baslik">
+                <h4>Fiyat Değişim Çizelgesi</h4>
+                <span class="grafik-aciklama">Eskiden yeniye doğru fiyat hareketi</span>
+            </div>
+
+            @if (fiyatGecmisiListesi.Any())
+            {
+                <div class="dinamik-chart-container">
+                    <div class="chart-y-axis">
+                        <span>@maxFiyat.ToString("N0")</span>
+                        <span>@(((minFiyat + maxFiyat) / 2).ToString("N0"))</span>
+                        <span>@minFiyat.ToString("N0")</span>
+                    </div>
+
+                    <div class="dinamik-chart">
+                        @foreach (var item in fiyatGecmisiListesi.OrderBy(x => x.Tarih))
+                        {
+                            var yukseklikYuzde = HesaplaYuzde(item.Fiyat);
+                            <div class="bar-kapsayici">
+                                <div class="bar-tooltip">
+                                    <span class="tooltip-fiyat">@item.Fiyat.ToString("N2")</span>
+                                    <span class="tooltip-tarih">@item.Tarih.ToLocalTime().ToString("dd.MM HH:mm")</span>
+                                </div>
+                                <div class="bar" style="height: @(yukseklikYuzde)%;">
+                                    <div class="bar-parilti"></div>
+                                </div>
+                                <span class="bar-tarih-etiket">@item.Tarih.ToLocalTime().ToString("dd.MM")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="bos-chart">
+                    <p>Fiyat çizelgesi oluşturmak için yeterli geçmiş veri bulunmuyor.</p>
+                </div>
+            }
+        </div>
+    }
 
 </div>
 
 <style>
+    body { background: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
+    .grafik-page { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+    
+    .loading-box, .hata-box { text-align: center; padding: 60px 20px; background: #1e293b; border-radius: 16px; border: 1px solid #334155; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+    .btn-geri { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #38bdf8; color: #0f172a; text-decoration: none; border-radius: 10px; font-weight: 600; }
+    
+    .baslik-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .geri-link { color: #38bdf8; text-decoration: none; font-weight: 600; transition: color 0.2s; }
+    .geri-link:hover { color: #7dd3fc; text-decoration: underline; }
+    .kategori-badge { background: #334155; color: #cbd5e1; padding: 6px 14px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; border: 1px solid #475569; }
 
-    .grafik-page {
-        min-height: 100vh;
-        background: #0f172a;
-        color: white;
-        padding: 40px;
-    }
+    .urun-mini-header { background: #1e293b; border-radius: 18px; border: 1px solid #334155; padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
+    .header-sol { display: flex; align-items: center; gap: 15px; }
+    .mini-gorsel { width: 60px; height: 60px; object-fit: contain; background: white; border-radius: 10px; padding: 4px; }
+    .mini-placeholder { width: 60px; height: 60px; background: #0f172a; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+    .header-sol h1 { font-size: 1.4rem; font-weight: 700; margin: 0 0 4px; color: white; }
+    .header-sol .satici { font-size: 0.85rem; color: #94a3b8; margin: 0; }
+    
+    .header-sag { display: flex; flex-direction: column; align-items: flex-end; background: #0f172a; padding: 10px 18px; border-radius: 12px; border: 1px solid #334155; }
+    .fiyat-etiket { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
+    .fiyat-deger { font-size: 1.4rem; font-weight: 800; color: #38bdf8; }
 
-    .grafik-card {
-        background: #1e293b;
-        padding: 30px;
-        border-radius: 18px;
-        margin-top: 30px;
-    }
+    .istatistik-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .istatistik-card { background: #1e293b; border-radius: 16px; border: 1px solid #334155; padding: 20px; display: flex; align-items: center; gap: 16px; transition: transform 0.2s; }
+    .istatistik-card:hover { transform: translateY(-2px); border-color: #475569; }
+    .ikon-kutu { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .ikon-kutu.min { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+    .ikon-kutu.max { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .ikon-kutu.ort { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+    .ikon-kutu.fark { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    
+    .veri-kutu { display: flex; flex-direction: column; overflow: hidden; }
+    .veri-kutu .baslik { font-size: 0.8rem; color: #94a3b8; font-weight: 600; margin-bottom: 4px; text-transform: uppercase; }
+    .veri-kutu .deger { font-size: 1.2rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .fiyat {
-        color: #60a5fa;
-        font-size: 1.4rem;
-        font-weight: bold;
-    }
+    .grafik-card { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+    .grafik-baslik { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 30px; border-bottom: 1px solid #334155; padding-bottom: 15px; }
+    .grafik-baslik h4 { font-size: 1.2rem; font-weight: 700; color: white; margin: 0; }
+    .grafik-aciklama { font-size: 0.85rem; color: #94a3b8; }
 
-    .fake-chart {
-        display: flex;
-        align-items: flex-end;
-        gap: 15px;
-        height: 300px;
-        margin-top: 30px;
-    }
+    .dinamik-chart-container { display: flex; gap: 15px; height: 340px; align-items: stretch; }
+    .chart-y-axis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #64748b; font-size: 0.75rem; font-weight: 600; padding-bottom: 24px; width: 60px; flex-shrink: 0; border-right: 1px dashed #334155; padding-right: 10px; }
+    
+    .dinamik-chart { flex: 1; display: flex; align-items: flex-end; gap: 12px; overflow-x: auto; padding-bottom: 5px; position: relative; }
+    
+    .bar-kapsayici { flex: 1; min-width: 40px; max-width: 80px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; group; }
+    
+    .bar-tooltip { position: absolute; top: -50px; background: #0f172a; border: 1px solid #38bdf8; padding: 6px 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; opacity: 0; pointer-events: none; transition: all 0.2s ease; transform: translateY(10px); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .bar-kapsayici:hover .bar-tooltip { opacity: 1; transform: translateY(0); }
+    .bar-tooltip:after { content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 10px; height: 10px; background: #0f172a; border-right: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; }
+    
+    .tooltip-fiyat { font-size: 0.85rem; font-weight: 700; color: #38bdf8; }
+    .tooltip-tarih { font-size: 0.65rem; color: #94a3b8; white-space: nowrap; }
 
-    .bar {
-        flex: 1;
-        background: #2563eb;
-        border-radius: 12px 12px 0 0;
-    }
+    .bar { width: 100%; background: linear-gradient(180deg, #38bdf8, #0284c7); border-radius: 8px 8px 0 0; position: relative; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 -4px 12px rgba(2, 132, 199, 0.2); }
+    .bar-kapsayici:hover .bar { filter: brightness(1.2); }
+    .bar-parilti { position: absolute; top: 0; left: 0; right: 0; height: 6px; background: rgba(255, 255, 255, 0.4); border-radius: 8px 8px 0 0; }
 
-    .aciklama {
-        margin-top: 20px;
-        color: #94a3b8;
-    }
+    .bar-tarih-etiket { font-size: 0.75rem; color: #94a3b8; margin-top: 8px; height: 16px; overflow: hidden; }
 
+    .bos-chart { height: 250px; display: flex; align-items: center; justify-content: center; color: #64748b; font-style: italic; }
 </style>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    FiyatTakipWebSitesi.Models.Urun? urun;
+    List<FiyatTakipWebSitesi.Models.FiyatGecmisi> fiyatGecmisiListesi = new();
+    decimal minFiyat = 0;
+    decimal maxFiyat = 0;
+    decimal ortalamaFiyat = 0;
+    decimal toplamFark = 0;
+    bool yukleniyor = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        yukleniyor = true;
+        urun = await UrunServisi.GetByIdAsync(Id);
+        
+        if (urun != null)
+        {
+            fiyatGecmisiListesi = await FiyatGecmisiServisi.GetByUrunAsync(Id);
+            var minMax = await FiyatGecmisiServisi.GetMinMaxAsync(Id);
+            minFiyat = minMax.Min;
+            maxFiyat = minMax.Max;
+            ortalamaFiyat = await FiyatGecmisiServisi.GetOrtalamaBySonGunAsync(Id, 30);
+            toplamFark = urun.SonFiyati - urun.BaslangicFiyati;
+        }
+        
+        yukleniyor = false;
+    }
+
+    double HesaplaYuzde(decimal fiyat)
+    {
+        if (maxFiyat == minFiyat) return 60; // Hepsi eşitse ortada dursun
+        
+        // Fiyatı min ile max arasında 20 ile 90 yüzdesi arasına ölçekleyelim
+        var oran = (double)((fiyat - minFiyat) / (maxFiyat - minFiyat));
+        return (oran * 70) + 20;
+    }
+}
