@@ -13,6 +13,18 @@ public class ScraperService
     private static readonly System.Globalization.CultureInfo _tr = new("tr-TR");
     private static readonly System.Globalization.CultureInfo _inv = System.Globalization.CultureInfo.InvariantCulture;
 
+    private static readonly string[] _userAgents =
+    [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:125.0) Gecko/20100101 Firefox/125.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
+    ];
+
+    private static string RastgeleUserAgent() => _userAgents[Random.Shared.Next(_userAgents.Length)];
+
     public ScraperService(ILogger<ScraperService> logger) => _logger = logger;
 
     private static ChromeOptions ChromeAyarlari()
@@ -27,11 +39,10 @@ public class ScraperService
         options.AddArgument("--disable-extensions");
         options.AddExcludedArgument("enable-automation");
         options.AddAdditionalOption("useAutomationExtension", false);
-        options.AddArgument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                            "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                            "Chrome/124.0.0.0 Safari/537.36");
+        options.AddArgument($"user-agent={RastgeleUserAgent()}");
         return options;
     }
+
 
     private static ChromeDriver DriverOlustur()
     {

@@ -39,7 +39,8 @@ public class Kullanici
     public bool PushBildirimleriniAc { get; set; } = true;
     
     // Relations
-    public ICollection<Urun> Urunler { get; set; } = new List<Urun>();
+    public ICollection<Urun> Urunler { get; set; } = [];
     
-    public ICollection<Uyari> Uyarilar { get; set; } = new List<Uyari>();
+    public ICollection<Uyari> Uyarilar { get; set; } = [];
 }
+

@@ -49,7 +49,9 @@ builder.Services.AddScoped<FiyatGecmisiService>();
 builder.Services.AddScoped<KategoriService>();
 builder.Services.AddScoped<KullaniciService>();
 builder.Services.AddScoped<UyariService>();
+builder.Services.AddHttpClient<ResimCacheService>();
 builder.Services.AddTransient<FiyatGuncellemeJob>();
+
 
 // ── Options Pattern ───────────────────────────────────────────────────────────
 builder.Services.Configure<FiyatTakipWebSitesi.Models.JwtSettings>(builder.Configuration.GetSection("Jwt"));

@@ -52,7 +52,7 @@ public class Urun
     public decimal? HedefFiyati { get; set; }
     
     // Relations
-    public ICollection<FiyatGecmisi> FiyatGecmisleri { get; set; } = new List<FiyatGecmisi>();
+    public ICollection<FiyatGecmisi> FiyatGecmisleri { get; set; } = [];
     
-    public ICollection<Uyari> Uyarilar { get; set; } = new List<Uyari>();
+    public ICollection<Uyari> Uyarilar { get; set; } = [];
 }

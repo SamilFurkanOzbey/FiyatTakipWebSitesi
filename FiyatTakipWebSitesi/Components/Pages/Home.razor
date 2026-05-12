@@ -15,6 +15,19 @@
         ⭐ Takip Ettiklerim Sayfasına Git
     </NavLink>
 
+    @if (!tumUrunler.Any())
+    {
+        <div class="seed-banner">
+            <div class="seed-content">
+                <h3>🚀 Veritabanınızda Henüz Ürün Yok</h3>
+                <p>Uygulamanın zengin arayüzünü ve grafiklerini hızlıca test etmek için örnek verileri yükleyebilirsiniz.</p>
+            </div>
+            <button class="seed-btn" @onclick="OrnekVeriYukleAsync" disabled="@yukleniyor">
+                @(yukleniyor ? "⏳ Yükleniyor..." : "✨ Örnek Veri Yükle (Seed)")
+            </button>
+        </div>
+    }
+
     <div class="kategori-row">
         @foreach (var kategori in kategoriler)
         {
@@ -68,6 +81,42 @@
 </div>
 
 <style>
+    .seed-banner {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        padding: 24px 32px;
+        border-radius: 20px;
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        animation: fadeIn 0.5s ease-out;
+    }
+    .seed-content h3 { color: #38bdf8; font-size: 1.3rem; font-weight: bold; margin-bottom: 6px; }
+    .seed-content p { color: #cbd5e1; font-size: 0.95rem; margin: 0; }
+    .seed-btn {
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 14px;
+        font-weight: bold;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+    }
+    .seed-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+        background: linear-gradient(135deg, #0369a1, #1d4ed8);
+    }
+    .seed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
     body { background: #0f172a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .home-container { padding: 30px; max-width: 1400px; margin: 0 auto; }
     .hero h1 { font-size: 42px; font-weight: bold; background: linear-gradient(90deg, #38bdf8, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -159,5 +208,29 @@
             secilenKategori = kategori;
             gosterilenUrunler = tumUrunler.Where(x => x.KategoriId == kategori.Id && x.Aktif).ToList();
         }
+    }
+
+    bool yukleniyor = false;
+
+    async Task OrnekVeriYukleAsync()
+    {
+        if (yukleniyor) return;
+        yukleniyor = true;
+        StateHasChanged();
+
+        await KategoriServisi.SeedVarsayilanKategorilerAsync();
+        await UrunServisi.SeedOrnekUrunlerAsync();
+
+        kategoriler = await KategoriServisi.GetAllAsync();
+        tumUrunler = await UrunServisi.GetAllAsync();
+
+        if (kategoriler.Any())
+        {
+            secilenKategori = null;
+            KategoriToggle(kategoriler.First());
+        }
+
+        yukleniyor = false;
+        StateHasChanged();
     }
 }

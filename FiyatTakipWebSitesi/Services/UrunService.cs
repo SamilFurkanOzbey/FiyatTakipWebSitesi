@@ -17,11 +17,13 @@ namespace FiyatTakipWebSitesi.Services;
 public class UrunService(
     ApplicationDbContext context,
     UyariService uyariService,
-    FiyatGecmisiService fiyatGecmisiService)
+    FiyatGecmisiService fiyatGecmisiService,
+    ResimCacheService resimCacheService)
 {
     private readonly ApplicationDbContext _context = context;
     private readonly UyariService _uyariService = uyariService;
     private readonly FiyatGecmisiService _fiyatGecmisiService = fiyatGecmisiService;
+    private readonly ResimCacheService _resimCacheService = resimCacheService;
 
     // --- Okuma ---
 
@@ -63,6 +65,9 @@ public class UrunService(
     {
         urun.EklendigiTarih = DateTime.UtcNow;
         urun.SonGuncellemeTarihi = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(urun.Resim))
+            urun.Resim = await _resimCacheService.ResimOnbellegeAlAsync(urun.Resim);
 
         _context.Urunler.Add(urun);
         await _context.SaveChangesAsync();
@@ -133,9 +138,13 @@ public class UrunService(
         var mevcut = await _context.Urunler.FindAsync(urun.Id);
         if (mevcut is null) return false;
 
+        if (!string.IsNullOrWhiteSpace(urun.Resim) && urun.Resim != mevcut.Resim)
+            mevcut.Resim = await _resimCacheService.ResimOnbellegeAlAsync(urun.Resim);
+        else if (!string.IsNullOrWhiteSpace(urun.Resim))
+            mevcut.Resim = urun.Resim;
+
         mevcut.Ad = urun.Ad;
         mevcut.URL = urun.URL;
-        mevcut.Resim = urun.Resim;
         mevcut.KategoriId = urun.KategoriId;
         mevcut.HedefFiyati = urun.HedefFiyati;
         mevcut.FiyatDususuBildir = urun.FiyatDususuBildir;
@@ -154,5 +163,50 @@ public class UrunService(
         urun.Aktif = false; // Soft delete
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task SeedOrnekUrunlerAsync()
+    {
+        if (await _context.Urunler.AnyAsync()) return;
+
+        var kategori = await _context.Kategoriler.FirstOrDefaultAsync(k => k.Ad == "Elektronik")
+                       ?? await _context.Kategoriler.FirstOrDefaultAsync();
+
+        if (kategori is null) return;
+
+        var urunler = new List<Urun>
+        {
+            new()
+            {
+                Ad = "Apple iPhone 15 (128 GB) - Siyah",
+                URL = "https://www.hepsiburada.com/iphone-15-128-gb-p-HBCV00004ZEWB8",
+                Resim = "https://productimages.hepsiburada.net/s/448/550/110000483863414.jpg",
+                Satici = "Hepsiburada",
+                BaslangicFiyati = 52999,
+                SonFiyati = 51499,
+                HedefFiyati = 49000,
+                KategoriId = kategori.Id,
+                ParaBirimi = "TRY",
+                Aktif = true
+            },
+            new()
+            {
+                Ad = "Samsung Galaxy S24 Ultra 512 GB",
+                URL = "https://www.hepsiburada.com/samsung-galaxy-s24-ultra-512-gb-p-HBCV00005OPYYR",
+                Resim = "https://productimages.hepsiburada.net/s/525/550/110000582239665.jpg",
+                Satici = "Samsung",
+                BaslangicFiyati = 69999,
+                SonFiyati = 69999,
+                HedefFiyati = 65000,
+                KategoriId = kategori.Id,
+                ParaBirimi = "TRY",
+                Aktif = true
+            }
+        };
+
+        foreach (var u in urunler)
+        {
+            await EkleAsync(u);
+        }
     }
 }
