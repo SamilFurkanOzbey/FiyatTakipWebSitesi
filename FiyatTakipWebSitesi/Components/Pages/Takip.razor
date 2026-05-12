@@ -1,164 +1,297 @@
 ﻿@page "/takip"
 @rendermode InteractiveServer
-@inject IJSRuntime JS
+@inject ScraperService Scraper
 
 <h2>⭐ Takip Ettiklerim</h2>
 
-<div style="margin-bottom:20px;">
+<div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
 
-    <!-- LINK INPUT -->
     <input @bind="yeniLink"
-           placeholder="Ürün linki yapıştır..."
-           style="width:300px; padding:6px;" />
+           @bind:event="oninput"
+           @onkeydown="EnterTusu"
+           placeholder="Hepsiburada, Çiçeksepeti, Teknosa, n11 veya PttAVM ürün linki yapıştır..."
+           style="width:340px; padding:8px; border-radius:6px; border:1px solid #334155; background:#1e293b; color:white;"
+           disabled="@yukleniyor" />
 
-    <!-- KATEGORİ -->
-    <select @bind="secilenKategori" style="margin-left:10px; padding:6px;">
+    <select @bind="secilenKategori"
+            style="padding:8px; border-radius:6px; border:1px solid #334155; background:#1e293b; color:white;">
         @foreach (var kategori in kategoriler)
         {
             <option value="@kategori">@kategori</option>
         }
     </select>
 
-    <!-- BUTON -->
     <button class="btn btn-primary"
-            style="margin-left:10px;"
-            @onclick="UrunEkle">
-        Ekle
+            @onclick="UrunEkle"
+            disabled="@(yukleniyor || string.IsNullOrWhiteSpace(yeniLink))">
+        @(yukleniyor ? "⏳ Ekleniyor..." : "➕ Ekle")
     </button>
 
 </div>
 
-<p style="color:green">@mesaj</p>
+@* ── YÜKLEME EKRANI ── *@
+@if (yukleniyor)
+{
+    <div style="background:#1e293b; border:1px solid #334155; border-radius:16px;
+                padding:28px 32px; max-width:480px; margin-bottom:24px;">
+
+        @* Başlık *@
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+            <div class="donus-cember"></div>
+            <div>
+                <p style="margin:0; font-weight:600; color:white; font-size:1rem;">Ürün bilgileri çekiliyor</p>
+                <p style="margin:0; font-size:0.78rem; color:#64748b;">Bu işlem 5–10 saniye sürebilir</p>
+            </div>
+        </div>
+
+        @* Adımlar *@
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            @foreach (var adim in adimlar)
+            {
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1rem; width:22px; text-align:center;">
+                        @if (adim.Durum == AdimDurum.Tamamlandi)
+                        { <text>✅</text> }
+                        else if (adim.Durum == AdimDurum.Devam)
+                        { <span class="nokta-animasyon">⚙️</span> }
+                        else
+                        {
+
+                            <span style="opacity:0.3">○</span>
+                        }
+                    </span>
+                    <span style="font-size:0.85rem;
+                                 color:@(adim.Durum == AdimDurum.Bekliyor ? "#475569" :
+                                         adim.Durum == AdimDurum.Devam    ? "#38bdf8" : "#94a3b8");">
+                        @adim.Metin
+                    </span>
+                </div>
+            }
+        </div>
+
+        @* İlerleme çubuğu *@
+        <div style="margin-top:20px; background:#0f172a; border-radius:999px; height:6px; overflow:hidden;">
+            <div style="height:100%; border-radius:999px; background:linear-gradient(90deg,#3b82f6,#38bdf8);
+                        width:@(ilerleme)%; transition:width 0.6s ease;"></div>
+        </div>
+        <p style="margin:6px 0 0; font-size:0.75rem; color:#475569; text-align:right;">%@ilerleme</p>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(mesaj) && !yukleniyor)
+{
+    <div class="alert @(hataVar ? "alert-danger" : "alert-success") py-2" style="max-width:500px;">
+        @mesaj
+    </div>
+}
 
 <hr />
 
-<h4>📦 Takip Listesi</h4>
+<h4>📦 Takip Listesi <span class="badge bg-secondary">@urunler.Count</span></h4>
 
-<div style="display:flex; gap:20px; flex-wrap:wrap;">
-
-    @foreach (var urun in urunler)
-    {
-        <div class="card" style="width: 18rem;">
-            <div class="card-body">
-
-                <h5 class="card-title">@urun.Ad</h5>
-                <p class="card-text">@urun.Fiyat</p>
-
-                <span class="badge bg-secondary">@urun.Kategori</span>
-
-                <br /><br />
-
-                <button class="btn btn-sm btn-danger"
-                        @onclick="() => Sil(urun)">
-                    Sil
-                </button>
-
+@if (!urunler.Any())
+{
+    <p style="color:#94a3b8;">Henüz takip edilen ürün yok. Yukarıdan bir Hepsiburada linki ekle.</p>
+}
+else
+{
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+        @foreach (var urun in urunler)
+        {
+            <div class="card" style="width:220px; background:#1e293b; border:1px solid #334155; border-radius:12px; overflow:hidden; color:white;">
+                @if (!string.IsNullOrEmpty(urun.ResimUrl))
+                {
+                    <img src="@urun.ResimUrl" alt="@urun.Ad"
+                         style="width:100%; height:160px; object-fit:contain; background:white; padding:8px;" />
+                }
+                else
+                {
+                    <div style="width:100%; height:160px; background:#2a2a4a; display:flex; align-items:center; justify-content:center; font-size:2.5rem;">🖼️</div>
+                }
+                <div class="card-body" style="padding:12px;">
+                    <p style="font-size:0.8rem; color:#cbd5e1; margin:0 0 6px; line-height:1.4;
+                               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                        @urun.Ad
+                    </p>
+                    <p style="font-size:1.1rem; font-weight:700; color:#38bdf8; margin:0 0 4px;">
+                        @urun.Fiyat
+                    </p>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 10px;">
+                        🏪 @urun.Satici
+                    </p>
+                    <span class="badge bg-secondary" style="margin-bottom:10px;">@urun.Kategori</span>
+                    <div style="display:flex; gap:6px; margin-top:8px;">
+                        <a href="@urun.Url" target="_blank"
+                           style="flex:1; text-align:center; padding:6px; background:#475569; border-radius:6px;
+                                  text-decoration:none; color:white; font-size:0.75rem;">
+                            🔗 Git
+                        </a>
+                        <button class="btn btn-sm btn-danger" style="flex:1; font-size:0.75rem;"
+                                @onclick="() => Sil(urun)">
+                            🗑️ Sil
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
-    }
+        }
+    </div>
+}
 
-</div>
+<style>
+    .donus-cember {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #1e3a5f;
+        border-top-color: #38bdf8;
+        border-radius: 50%;
+        animation: don 0.8s linear infinite;
+        flex-shrink: 0;
+    }
+    @@keyframes don {
+        to { transform: rotate(360deg); }
+    }
+    .nokta-animasyon {
+        display: inline-block;
+        animation: don 1.2s linear infinite;
+    }
+</style>
 
 @code {
 
-    // KATEGORİLER
-    List<string> kategoriler = new()
+    // ── Adım modeli ────────────────────────────────────────────
+    enum AdimDurum { Bekliyor, Devam, Tamamlandi }
+    class Adim
     {
-        "Telefon",
-        "Bilgisayar",
-        "Elektronik",
-        "Giyim",
-        "Diğer"
+        public string Metin   { get; set; } = "";
+        public AdimDurum Durum { get; set; } = AdimDurum.Bekliyor;
+    }
+
+    // Selenium sürecindeki adımlar — sitenin adına göre dinamik
+    List<Adim> adimlar = new()
+    {
+        new() { Metin = "Chrome tarayıcısı başlatılıyor" },
+        new() { Metin = "Sayfaya gidiliyor" },
+        new() { Metin = "Sayfa yüklenmesi bekleniyor" },
+        new() { Metin = "Ürün adı ve fiyat okunuyor" },
+        new() { Metin = "Resim ve satıcı bilgisi alınıyor" },
     };
 
-    string secilenKategori = "Telefon";
+    int ilerleme = 0; // 0–100 arası ilerleme çubuğu değeri
 
-    // MODEL
-    public class Urun
+    // ── Diğer değişkenler ──────────────────────────────────────
+    List<string> kategoriler = new() { "Telefon", "Bilgisayar", "Elektronik", "Giyim", "Diğer" };
+    string secilenKategori   = "Telefon";
+    string yeniLink          = "";
+    string mesaj             = "";
+    bool   hataVar           = false;
+    bool   yukleniyor        = false;
+
+    List<TakipUrun> urunler = new();
+
+    public class TakipUrun
     {
-        public string Ad { get; set; }
-        public string Fiyat { get; set; }
-        public string Kategori { get; set; }
+        public string Ad       { get; set; } = "";
+        public string Fiyat    { get; set; } = "";
+        public string ResimUrl { get; set; } = "";
+        public string Satici   { get; set; } = "";
+        public string Url      { get; set; } = "";
+        public string Kategori { get; set; } = "";
     }
 
-    // LİSTE
-    List<Urun> urunler = new();
-
-    string yeniLink = "";
-    string mesaj = "";
-
-    // SAYFA AÇILINCA ÇALIŞIR
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    async Task EnterTusu(KeyboardEventArgs e)
     {
-        if (firstRender)
-        {
-            var data = await JS.InvokeAsync<string>("localStorage.getItem", "takipUrunler");
-
-            if (!string.IsNullOrEmpty(data))
-            {
-                urunler = System.Text.Json.JsonSerializer.Deserialize<List<Urun>>(data);
-                StateHasChanged();
-            }
-        }
+        if (e.Key == "Enter") await UrunEkle();
     }
 
-    // ÜRÜN EKLE
     async Task UrunEkle()
     {
-        if (string.IsNullOrWhiteSpace(yeniLink))
+        if (string.IsNullOrWhiteSpace(yeniLink)) return;
+
+        var temizLink = yeniLink.Trim();
+
+        // URL geçerlilik kontrolü — scrape'e gitmeden önce
+        var urlHatasi = ScraperService.UrunUrlHatasi(temizLink);
+        if (urlHatasi != null)
         {
-            mesaj = "Link gir!";
+            mesaj   = urlHatasi;
+            hataVar = true;
             return;
         }
 
-        var yeniUrun = new Urun
+        if (urunler.Any(u => u.Url == temizLink))
         {
-            Ad = ParseUrunAdi(yeniLink),
-            Fiyat = "Henüz çekilmedi",
-            Kategori = secilenKategori
-        };
+            mesaj  = "Bu ürün zaten listende!";
+            hataVar = true;
+            return;
+        }
 
-        urunler.Add(yeniUrun);
+        // Adımları sıfırla — site adına göre 2. adımı güncelle
+        var siteAdi = ScraperService.SiteAdi(ScraperService.SiteTespit(temizLink));
+        adimlar[1].Metin = $"{siteAdi} sayfasına gidiliyor";
+        foreach (var a in adimlar) a.Durum = AdimDurum.Bekliyor;
+        ilerleme   = 0;
+        yukleniyor = true;
+        mesaj      = "";
+        hataVar    = false;
 
-        // KAYDET
-        await JS.InvokeVoidAsync("localStorage.setItem",
-            "takipUrunler",
-            System.Text.Json.JsonSerializer.Serialize(urunler));
+        // Scraper arka planda çalışırken adımları simüle et
+        var scrapeGorev = Scraper.GetUrunDetayAsync(temizLink);
 
-        yeniLink = "";
-        mesaj = "Ürün eklendi!";
-    }
+        // Her adımı yaklaşık Selenium süresine yayarak göster
+        // Toplam ~8 saniyeyi 5 adıma böl
+        int[] bekleme = { 800, 1200, 2500, 1500, 1000 };
+        for (int i = 0; i < adimlar.Count; i++)
+        {
+            adimlar[i].Durum = AdimDurum.Devam;
+            ilerleme = (i + 1) * 18; // 18, 36, 54, 72, 90
+            StateHasChanged();
+            await Task.Delay(bekleme[i]);
 
-    // ÜRÜN SİL
-    async Task Sil(Urun urun)
-    {
-        urunler.Remove(urun);
+            // Scraper bittiyse döngüyü kes
+            if (scrapeGorev.IsCompleted) break;
 
-        await JS.InvokeVoidAsync("localStorage.setItem",
-            "takipUrunler",
-            System.Text.Json.JsonSerializer.Serialize(urunler));
-    }
+            adimlar[i].Durum = AdimDurum.Tamamlandi;
+        }
 
-    // LINKTEN İSİM ÇIKAR
-    string ParseUrunAdi(string url)
-    {
         try
         {
-            var uri = new Uri(url);
-            string path = uri.AbsolutePath;
+            var detay = await scrapeGorev; // sonucu bekle (çoğunlukla zaten bitti)
 
-            string name = path.Replace("/", "")
-                              .Replace("-", " ")
-                              .Replace("_", " ");
+            // Tüm adımları tamamlandı yap
+            foreach (var a in adimlar) a.Durum = AdimDurum.Tamamlandi;
+            ilerleme = 100;
+            StateHasChanged();
+            await Task.Delay(400); // kısa bir "tamamlandı" gösterimi
 
-            if (string.IsNullOrWhiteSpace(name))
-                return "Ürün";
+            urunler.Add(new TakipUrun
+            {
+                Ad       = detay.Ad,
+                Fiyat    = detay.Fiyat,
+                ResimUrl = detay.ResimUrl,
+                Satici   = detay.Satici,
+                Url      = detay.Url,
+                Kategori = secilenKategori
+            });
 
-            return char.ToUpper(name[0]) + name.Substring(1);
+            yeniLink = "";
+            mesaj    = $"✅ \"{detay.Ad}\" takip listesine eklendi!";
+            hataVar  = false;
         }
-        catch
+        catch (Exception ex)
         {
-            return "Geçersiz link";
+            mesaj   = $"Hata: {ex.Message}";
+            hataVar = true;
         }
+        finally
+        {
+            yukleniyor = false;
+        }
+    }
+
+    void Sil(TakipUrun urun)
+    {
+        urunler.Remove(urun);
+        mesaj   = "Ürün listeden kaldırıldı.";
+        hataVar = false;
     }
 }
