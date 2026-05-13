@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
 @inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
+@inject NavigationManager NavManager
 <PageTitle>Ana Sayfa</PageTitle>
 
 <div class="home-container">
@@ -9,6 +10,74 @@
     <div class="hero">
         <h1>Fiyat Takip</h1>
         <p>Ürünleri incele ve fiyat geçmişlerini takip et.</p>
+
+        <!-- ── ARAMA ÇUBUĞU ── -->
+        <div class="search-wrapper" id="search-wrapper">
+            <div class="search-box @(aramaAktif ? "focused" : "")">
+                <span class="search-icon">🔍</span>
+                <input id="search-input"
+                       type="text"
+                       placeholder="Ürün adı ara... (en az 2 karakter)"
+                       autocomplete="off"
+                       value="@aramaMetni"
+                       @oninput="AramaGuncelle"
+                       @onfocus="() => { aramaAktif = true; }"
+                       @onkeydown="TusaBas" />
+                @if (!string.IsNullOrEmpty(aramaMetni))
+                {
+                    <button class="clear-btn" @onclick="AramaTemizle" title="Temizle">✕</button>
+                }
+            </div>
+
+            @if (oneriListesi.Count > 0)
+            {
+                <div class="dropdown-panel" id="search-dropdown">
+                    @for (int i = 0; i < oneriListesi.Count; i++)
+                    {
+                        var idx = i;
+                        var oneri = oneriListesi[i];
+                        <div class="dropdown-item @(seciliOneriIndex == idx ? "highlighted" : "")"
+                             @onclick="() => OneriSec(oneri)"
+                             @onmouseover="() => seciliOneriIndex = idx">
+                            <div class="oneri-resim">
+                                @if (!string.IsNullOrEmpty(oneri.Resim))
+                                {
+                                    <img src="@oneri.Resim" alt="@oneri.Ad" />
+                                }
+                                else
+                                {
+                                    <span class="oneri-resim-yok">🖼️</span>
+                                }
+                            </div>
+                            <div class="oneri-bilgi">
+                                <span class="oneri-ad">@oneri.Ad</span>
+                                <span class="oneri-alt">
+                                    <span class="oneri-fiyat">@oneri.SonFiyati.ToString("N2") @oneri.ParaBirimi</span>
+                                    @if (!string.IsNullOrEmpty(oneri.Kategori))
+                                    {
+                                        <span class="oneri-kategori">📦 @oneri.Kategori</span>
+                                    }
+                                </span>
+                            </div>
+                            <span class="oneri-ok">→</span>
+                        </div>
+                    }
+                </div>
+            }
+            else if (aramaYukleniyor)
+            {
+                <div class="dropdown-panel">
+                    <div class="dropdown-yukleniyor">⏳ Aranıyor...</div>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(aramaMetni) && aramaMetni.Length >= 2 && !aramaYukleniyor)
+            {
+                <div class="dropdown-panel">
+                    <div class="dropdown-bos">Sonuç bulunamadı 😕</div>
+                </div>
+            }
+        </div>
+        <!-- ── /ARAMA ÇUBUĞU ── -->
     </div>
 
     <NavLink href="/takip" class="tum-kategori-btn">
@@ -24,6 +93,18 @@
             </div>
             <button class="seed-btn" @onclick="OrnekVeriYukleAsync" disabled="@yukleniyor">
                 @(yukleniyor ? "⏳ Yükleniyor..." : "✨ Örnek Veri Yükle (Seed)")
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="seed-banner seed-banner-danger">
+            <div class="seed-content">
+                <h3>🗑️ Tüm Ürünleri Sil</h3>
+                <p>Veritabanındaki tüm ürünleri (örnek veriler dahil) kalıcı olarak silebilirsiniz.</p>
+            </div>
+            <button class="seed-btn seed-btn-danger" @onclick="TumUrunleriSilAsync" disabled="@yukleniyor">
+                @(yukleniyor ? "⏳ Siliniyor..." : "🗑️ Tümünü Kalıcı Sil")
             </button>
         </div>
     }
@@ -117,6 +198,19 @@
     }
     .seed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
+    .seed-banner-danger {
+        border-color: rgba(220, 38, 38, 0.35);
+    }
+    .seed-banner-danger .seed-content h3 { color: #f87171; }
+    .seed-btn-danger {
+        background: linear-gradient(135deg, #b91c1c, #dc2626);
+        box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+    }
+    .seed-btn-danger:hover:not(:disabled) {
+        background: linear-gradient(135deg, #991b1b, #b91c1c);
+        box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6);
+    }
+
     body { background: #0f172a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .home-container { padding: 30px; max-width: 1400px; margin: 0 auto; }
     .hero h1 { font-size: 42px; font-weight: bold; background: linear-gradient(90deg, #38bdf8, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -176,24 +270,148 @@
     .bos-uyari { padding: 40px; text-align: center; background: #1e293b; border-radius: 16px; border: 1px dashed #475569; color: #94a3b8; animation: fadeIn 0.3s; }
     .ekle-link { display: inline-block; margin-top: 12px; color: #38bdf8; text-decoration: none; font-weight: 600; }
     .ekle-link:hover { text-decoration: underline; }
+
+    /* ── ARAMA ÇUBUĞU ── */
+    .search-wrapper {
+        position: relative;
+        width: 100%;
+        max-width: 680px;
+        margin: 24px auto 8px;
+    }
+    .search-box {
+        display: flex;
+        align-items: center;
+        background: rgba(30, 41, 59, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1.5px solid #334155;
+        border-radius: 16px;
+        padding: 0 18px;
+        gap: 12px;
+        transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .search-box.focused {
+        border-color: #38bdf8;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15), 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .search-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .search-box input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #f1f5f9;
+        font-size: 1rem;
+        padding: 16px 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .search-box input::placeholder { color: #64748b; }
+    .clear-btn {
+        background: none;
+        border: none;
+        color: #64748b;
+        font-size: 1rem;
+        cursor: pointer;
+        padding: 4px 6px;
+        border-radius: 6px;
+        transition: color 0.2s, background 0.2s;
+        flex-shrink: 0;
+    }
+    .clear-btn:hover { color: #f1f5f9; background: rgba(255,255,255,0.07); }
+    .dropdown-panel {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.97);
+        backdrop-filter: blur(20px);
+        border: 1.5px solid #334155;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        z-index: 1000;
+        animation: dropdownSlide 0.18s ease-out;
+    }
+    @@keyframes dropdownSlide {
+        from { opacity: 0; transform: translateY(-6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 18px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(51,65,85,0.5);
+        transition: background 0.15s ease;
+    }
+    .dropdown-item:last-child { border-bottom: none; }
+    .dropdown-item:hover, .dropdown-item.highlighted {
+        background: rgba(56, 189, 248, 0.08);
+    }
+    .oneri-resim {
+        width: 50px;
+        height: 50px;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .oneri-resim img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+    .oneri-resim-yok { font-size: 1.5rem; }
+    .oneri-bilgi {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+    .oneri-ad {
+        color: #f1f5f9;
+        font-size: 0.92rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .oneri-alt { display: flex; align-items: center; gap: 10px; }
+    .oneri-fiyat { color: #38bdf8; font-size: 0.88rem; font-weight: 700; }
+    .oneri-kategori { color: #64748b; font-size: 0.78rem; }
+    .oneri-ok { color: #475569; font-size: 1rem; flex-shrink: 0; transition: color 0.15s; }
+    .dropdown-item:hover .oneri-ok, .dropdown-item.highlighted .oneri-ok { color: #38bdf8; }
+    .dropdown-yukleniyor, .dropdown-bos {
+        padding: 20px;
+        text-align: center;
+        color: #64748b;
+        font-size: 0.95rem;
+    }
+    /* ── /ARAMA ÇUBUĞU ── */
 </style>
 
 @code {
+    // ── Kategori & Ürün Listesi ──
     List<FiyatTakipWebSitesi.Models.Kategori> kategoriler = new();
     List<FiyatTakipWebSitesi.Models.Urun> tumUrunler = new();
     List<FiyatTakipWebSitesi.Models.Urun> gosterilenUrunler = new();
     FiyatTakipWebSitesi.Models.Kategori? secilenKategori = null;
+
+    // ── Arama ──
+    string aramaMetni = "";
+    bool aramaAktif = false;
+    bool aramaYukleniyor = false;
+    int seciliOneriIndex = -1;
+    List<AramaOneriSonucu> oneriListesi = new();
+    CancellationTokenSource? _debounceCts;
 
     protected override async Task OnInitializedAsync()
     {
         kategoriler = await KategoriServisi.GetAllAsync();
         tumUrunler = await UrunServisi.GetAllAsync();
 
-        // Varsayılan olarak ilk kategoriyi seçili yapalım
         if (kategoriler.Any())
-        {
             KategoriToggle(kategoriler.First());
-        }
     }
 
     void KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
@@ -210,6 +428,92 @@
         }
     }
 
+    // ── Arama Metotları ──
+
+    async Task AramaGuncelle(ChangeEventArgs e)
+    {
+        aramaMetni = e.Value?.ToString() ?? "";
+        seciliOneriIndex = -1;
+
+        // Debounce: 300ms bekle
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var token = _debounceCts.Token;
+
+        if (aramaMetni.Length < 2)
+        {
+            oneriListesi.Clear();
+            aramaYukleniyor = false;
+            return;
+        }
+
+        aramaYukleniyor = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(300, token);
+            if (token.IsCancellationRequested) return;
+
+            var sonuclar = await UrunServisi.AraAsync(aramaMetni, limit: 8);
+            oneriListesi = sonuclar.Select(u => new AramaOneriSonucu
+            {
+                Id = u.Id,
+                Ad = u.Ad,
+                Resim = u.Resim,
+                SonFiyati = u.SonFiyati,
+                ParaBirimi = u.ParaBirimi,
+                Kategori = u.Kategori?.Ad ?? ""
+            }).ToList();
+        }
+        catch (TaskCanceledException) { /* debounce iptal - normal */ }
+        finally
+        {
+            aramaYukleniyor = false;
+            StateHasChanged();
+        }
+    }
+
+    void AramaTemizle()
+    {
+        aramaMetni = "";
+        oneriListesi.Clear();
+        aramaYukleniyor = false;
+        aramaAktif = false;
+        seciliOneriIndex = -1;
+        _debounceCts?.Cancel();
+    }
+
+    void OneriSec(AramaOneriSonucu oneri)
+    {
+        AramaTemizle();
+        NavManager.NavigateTo($"/urundetay/{oneri.Id}");
+    }
+
+    void TusaBas(KeyboardEventArgs e)
+    {
+        if (oneriListesi.Count == 0) return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                seciliOneriIndex = Math.Min(seciliOneriIndex + 1, oneriListesi.Count - 1);
+                break;
+            case "ArrowUp":
+                seciliOneriIndex = Math.Max(seciliOneriIndex - 1, 0);
+                break;
+            case "Enter":
+                if (seciliOneriIndex >= 0 && seciliOneriIndex < oneriListesi.Count)
+                    OneriSec(oneriListesi[seciliOneriIndex]);
+                break;
+            case "Escape":
+                oneriListesi.Clear();
+                aramaAktif = false;
+                break;
+        }
+    }
+
+    // ── Seed ──
     bool yukleniyor = false;
 
     async Task OrnekVeriYukleAsync()
@@ -232,5 +536,31 @@
 
         yukleniyor = false;
         StateHasChanged();
+    }
+
+    async Task TumUrunleriSilAsync()
+    {
+        if (yukleniyor) return;
+        yukleniyor = true;
+        StateHasChanged();
+
+        await UrunServisi.SeedSifirlaAsync();
+
+        tumUrunler.Clear();
+        gosterilenUrunler.Clear();
+        secilenKategori = null;
+
+        yukleniyor = false;
+        StateHasChanged();
+    }
+    // ── Yardımcı Model ──
+    class AramaOneriSonucu
+    {
+        public int Id { get; set; }
+        public string Ad { get; set; } = "";
+        public string? Resim { get; set; }
+        public decimal SonFiyati { get; set; }
+        public string ParaBirimi { get; set; } = "TRY";
+        public string Kategori { get; set; } = "";
     }
 }

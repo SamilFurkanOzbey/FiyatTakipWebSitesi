@@ -40,6 +40,7 @@ public class UrunService(
             .AsNoTracking()
             .Include(u => u.Kategori)
             .Include(u => u.Kullanici)
+            .Where(u => u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)
             .ToListAsync();
 
@@ -66,6 +67,22 @@ public class UrunService(
             .Where(u => u.UserId == kullaniciId && u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)
             .ToListAsync();
+
+    public async Task<List<Urun>> AraAsync(string aramaMetni, int limit = 8)
+    {
+        if (string.IsNullOrWhiteSpace(aramaMetni))
+            return [];
+
+        var metin = aramaMetni.Trim();
+
+        return await _context.Urunler
+            .AsNoTracking()
+            .Include(u => u.Kategori)
+            .Where(u => u.Aktif && EF.Functions.Like(u.Ad, $"%{metin}%"))
+            .OrderByDescending(u => u.EklendigiTarih)
+            .Take(limit)
+            .ToListAsync();
+    }
 
     // --- Yazma ---
 
@@ -277,6 +294,14 @@ public class UrunService(
         {
             await EkleAsync(u);
         }
+    }
+
+    public async Task SeedSifirlaAsync()
+    {
+        // Tüm ürünleri ve ilişkili fiyat/uyarı kayıtlarını kalıcı olarak siler
+        var hepsi = await _context.Urunler.ToListAsync();
+        _context.Urunler.RemoveRange(hepsi);
+        await _context.SaveChangesAsync();
     }
 }
 

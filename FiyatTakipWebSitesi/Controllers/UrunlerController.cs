@@ -17,16 +17,40 @@ namespace FiyatTakipWebSitesi.Controllers;
 [ApiController]
 [Route("api/urunler")]
 [Produces("application/json")]
-public class UrunlerController : ControllerBase
+public class UrunlerController(UrunService urunService, ILogger<UrunlerController> logger) : ControllerBase
 {
-    private readonly UrunService _urunService;
-    private readonly ILogger<UrunlerController> _logger;
+    private readonly UrunService _urunService = urunService;
+    private readonly ILogger<UrunlerController> _logger = logger;
     private readonly UrunMapper _mapper = new();
 
-    public UrunlerController(UrunService urunService, ILogger<UrunlerController> logger)
+    // ── GET /api/urunler/ara?q={metin} ───────────────
+    /// <summary>Ürün adına göre autocomplete öneriler döner</summary>
+    [HttpGet("ara")]
+    [ProducesResponseType(typeof(IEnumerable<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Ara([FromQuery] string q = "")
     {
-        _urunService = urunService;
-        _logger = logger;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+                return Ok(Array.Empty<object>());
+
+            var urunler = await _urunService.AraAsync(q, limit: 8);
+            var sonuc = urunler.Select(u => new
+            {
+                u.Id,
+                u.Ad,
+                u.Resim,
+                u.SonFiyati,
+                u.ParaBirimi,
+                Kategori = u.Kategori?.Ad ?? ""
+            });
+            return Ok(sonuc);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ürün araması sırasında hata oluştu. q={Q}", q);
+            return StatusCode(500, new { hata = "Arama sırasında bir hata oluştu." });
+        }
     }
 
     // ── GET /api/urunler ──────────────────────────────
