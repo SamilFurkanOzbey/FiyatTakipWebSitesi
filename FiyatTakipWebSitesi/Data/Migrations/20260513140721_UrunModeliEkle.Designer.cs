@@ -4,6 +4,7 @@ using FiyatTakipWebSitesi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FiyatTakipWebSitesi.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513140721_UrunModeliEkle")]
+    partial class UrunModeliEkle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -234,22 +237,16 @@ namespace FiyatTakipWebSitesi.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-<<<<<<< HEAD
-=======
                     b.Property<string>("Aciklama")
                         .HasColumnType("nvarchar(max)");
 
->>>>>>> f7bda775aa08461dd11e4cea24373251c138b397
                     b.Property<string>("Ad")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-<<<<<<< HEAD
-=======
                     b.Property<bool>("Aktif")
                         .HasColumnType("bit");
 
->>>>>>> f7bda775aa08461dd11e4cea24373251c138b397
                     b.Property<int>("KategoriId")
                         .HasColumnType("int");
 
@@ -331,11 +328,7 @@ namespace FiyatTakipWebSitesi.Data.Migrations
                         .IsRequired();
 
                     b.HasOne("FiyatTakipWebSitesi.Models.UrunModeli", "UrunModeli")
-<<<<<<< HEAD
-                        .WithMany("Urunler")
-=======
                         .WithMany("Listeler")
->>>>>>> f7bda775aa08461dd11e4cea24373251c138b397
                         .HasForeignKey("UrunModeliId")
                         .OnDelete(DeleteBehavior.SetNull);
 
@@ -356,11 +349,7 @@ namespace FiyatTakipWebSitesi.Data.Migrations
                     b.HasOne("FiyatTakipWebSitesi.Models.Kategori", "Kategori")
                         .WithMany()
                         .HasForeignKey("KategoriId")
-<<<<<<< HEAD
-                        .OnDelete(DeleteBehavior.Restrict)
-=======
                         .OnDelete(DeleteBehavior.NoAction)
->>>>>>> f7bda775aa08461dd11e4cea24373251c138b397
                         .IsRequired();
 
                     b.Navigation("Kategori");
@@ -406,11 +395,7 @@ namespace FiyatTakipWebSitesi.Data.Migrations
 
             modelBuilder.Entity("FiyatTakipWebSitesi.Models.UrunModeli", b =>
                 {
-<<<<<<< HEAD
-                    b.Navigation("Urunler");
-=======
                     b.Navigation("Listeler");
->>>>>>> f7bda775aa08461dd11e4cea24373251c138b397
                 });
 #pragma warning restore 612, 618
         }

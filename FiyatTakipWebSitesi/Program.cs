@@ -86,8 +86,9 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 
 // ── Migration & Seed ──────────────────────────────────────────────────────────
-
-/*
+// Uygulama her başladığında: bekleyen migration'ları uygular, kategorileri
+// (eğer tablo boşsa) seed eder, sistem katalogunu (eğer boşsa) seed eder.
+// Her iki seed metodu da idempotent — kayıt varsa hiçbir şey yapmaz.
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -95,9 +96,10 @@ await using (var scope = app.Services.CreateAsyncScope())
 
     var kategoriService = scope.ServiceProvider.GetRequiredService<KategoriService>();
     await kategoriService.SeedVarsayilanKategorilerAsync();
-}
 
-*/
+    var urunService = scope.ServiceProvider.GetRequiredService<UrunService>();
+    await urunService.SeedKatalogAsync();
+}
 
 // ── HTTP Pipeline ─────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
@@ -113,26 +115,45 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 // ── Hangfire Dashboard ────────────────────────────────────────────────────────
+// /hangfire altındaki istekler için thread culture'ını en-US'a sabitler.
+// Bu sayede dashboard arayüzü İngilizce render edilir; uygulamanın kalanı
+// (Razor sayfaları, hata mesajları vs.) sistem dilinde kalmaya devam eder.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/hangfire"))
+    {
+        var culture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+        System.Globalization.CultureInfo.CurrentCulture = culture;
+        System.Globalization.CultureInfo.CurrentUICulture = culture;
+    }
+    await next();
+});
+
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
-    Authorization = app.Environment.IsDevelopment() 
+    Authorization = app.Environment.IsDevelopment()
         ? [] // Geliştirme ortamında herkese açık
         : [new FiyatTakipWebSitesi.Filters.HangfireAuthorizationFilter()] // Canlı ortamda kimlik doğrulaması gerektir
 });
 
 // ── Periyodik Job Kayıtları ───────────────────────────────────────────────────
-RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
-    recurringJobId: "fiyat-guncelle-saatlik",
-    methodCall:     job => job.TumUrunlerGuncelleAsync(),
-    cronExpression: Cron.Hourly,
-    options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
-
-// Ayrıca her gün 06:00'da tam güncelleme (saatlik ile aynı metod)
+// Günde 2 kez: 06:00 (sabah) ve 18:00 (akşam). Selenium yükü ve anti-bot
+// riskini düşük tutmak için saatlik tarama yapılmıyor — kullanıcı tek ürünü
+// elle yenilemek isterse UrunService.TekUrunYenileAsync üzerinden tetikler.
 RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
     recurringJobId: "fiyat-guncelle-gunluk-sabah",
     methodCall:     job => job.TumUrunlerGuncelleAsync(),
     cronExpression: "0 6 * * *",
     options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
+    recurringJobId: "fiyat-guncelle-gunluk-aksam",
+    methodCall:     job => job.TumUrunlerGuncelleAsync(),
+    cronExpression: "0 18 * * *",
+    options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+// Eski saatlik job artık kullanılmıyor — Hangfire'dan da silinmesi gerekiyor.
+RecurringJob.RemoveIfExists("fiyat-guncelle-saatlik");
 
 app.MapStaticAssets();
 app.MapControllers();
