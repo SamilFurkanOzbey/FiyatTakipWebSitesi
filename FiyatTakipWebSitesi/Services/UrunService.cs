@@ -59,6 +59,22 @@ public class UrunService(
             .OrderByDescending(u => u.EklendigiTarih)
             .ToListAsync();
 
+    public async Task<List<Urun>> AraAsync(string aramaMetni, int limit = 8)
+    {
+        if (string.IsNullOrWhiteSpace(aramaMetni))
+            return [];
+
+        var metin = aramaMetni.Trim();
+
+        return await _context.Urunler
+            .AsNoTracking()
+            .Include(u => u.Kategori)
+            .Where(u => u.Aktif && EF.Functions.Like(u.Ad, $"%{metin}%"))
+            .OrderByDescending(u => u.EklendigiTarih)
+            .Take(limit)
+            .ToListAsync();
+    }
+
     // --- Yazma ---
 
     public async Task<Urun> EkleAsync(Urun urun)
