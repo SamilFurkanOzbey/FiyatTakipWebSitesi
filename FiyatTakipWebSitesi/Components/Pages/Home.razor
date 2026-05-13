@@ -96,6 +96,18 @@
             </button>
         </div>
     }
+    else
+    {
+        <div class="seed-banner seed-banner-danger">
+            <div class="seed-content">
+                <h3>🗑️ Tüm Ürünleri Sil</h3>
+                <p>Veritabanındaki tüm ürünleri (örnek veriler dahil) kalıcı olarak silebilirsiniz.</p>
+            </div>
+            <button class="seed-btn seed-btn-danger" @onclick="TumUrunleriSilAsync" disabled="@yukleniyor">
+                @(yukleniyor ? "⏳ Siliniyor..." : "🗑️ Tümünü Kalıcı Sil")
+            </button>
+        </div>
+    }
 
     <div class="kategori-row">
         @foreach (var kategori in kategoriler)
@@ -185,6 +197,19 @@
         background: linear-gradient(135deg, #0369a1, #1d4ed8);
     }
     .seed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .seed-banner-danger {
+        border-color: rgba(220, 38, 38, 0.35);
+    }
+    .seed-banner-danger .seed-content h3 { color: #f87171; }
+    .seed-btn-danger {
+        background: linear-gradient(135deg, #b91c1c, #dc2626);
+        box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+    }
+    .seed-btn-danger:hover:not(:disabled) {
+        background: linear-gradient(135deg, #991b1b, #b91c1c);
+        box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6);
+    }
 
     body { background: #0f172a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .home-container { padding: 30px; max-width: 1400px; margin: 0 auto; }
@@ -513,6 +538,21 @@
         StateHasChanged();
     }
 
+    async Task TumUrunleriSilAsync()
+    {
+        if (yukleniyor) return;
+        yukleniyor = true;
+        StateHasChanged();
+
+        await UrunServisi.SeedSifirlaAsync();
+
+        tumUrunler.Clear();
+        gosterilenUrunler.Clear();
+        secilenKategori = null;
+
+        yukleniyor = false;
+        StateHasChanged();
+    }
     // ── Yardımcı Model ──
     class AramaOneriSonucu
     {

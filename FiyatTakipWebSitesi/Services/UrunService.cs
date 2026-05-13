@@ -32,6 +32,7 @@ public class UrunService(
             .AsNoTracking()
             .Include(u => u.Kategori)
             .Include(u => u.Kullanici)
+            .Where(u => u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)
             .ToListAsync();
 
@@ -224,5 +225,13 @@ public class UrunService(
         {
             await EkleAsync(u);
         }
+    }
+
+    public async Task SeedSifirlaAsync()
+    {
+        // Tüm ürünleri ve ilişkili fiyat/uyarı kayıtlarını kalıcı olarak siler
+        var hepsi = await _context.Urunler.ToListAsync();
+        _context.Urunler.RemoveRange(hepsi);
+        await _context.SaveChangesAsync();
     }
 }
