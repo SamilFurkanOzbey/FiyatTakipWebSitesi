@@ -18,12 +18,20 @@ public class UrunService(
     ApplicationDbContext context,
     UyariService uyariService,
     FiyatGecmisiService fiyatGecmisiService,
-    ResimCacheService resimCacheService)
+    ResimCacheService resimCacheService,
+    ScraperService scraperService,
+    ILogger<UrunService> logger)
 {
     private readonly ApplicationDbContext _context = context;
     private readonly UyariService _uyariService = uyariService;
     private readonly FiyatGecmisiService _fiyatGecmisiService = fiyatGecmisiService;
     private readonly ResimCacheService _resimCacheService = resimCacheService;
+    private readonly ScraperService _scraperService = scraperService;
+    private readonly ILogger<UrunService> _logger = logger;
+
+    // Aynı ürün için iki yenileme denemesi arasındaki minimum süre.
+    // Anti-bot tetiklenmesini ve kullanıcıların butonu spam'lemesini önler.
+    private static readonly TimeSpan _yenilemeBekleme = TimeSpan.FromMinutes(5);
 
     // --- Okuma ---
 
@@ -155,6 +163,67 @@ public class UrunService(
         return true;
     }
 
+    // --- Tek ürün yenileme (kullanıcı butonu) ---
+
+    /// <summary>
+    /// Tek bir ürünün fiyatını anında scrape eder ve günceller.
+    /// Son 5 dakika içinde zaten güncellenmişse scrape etmez,
+    /// mevcut veriyi "güncel" olarak geri döner.
+    /// </summary>
+    public async Task<YenilemeSonucu> TekUrunYenileAsync(int id)
+    {
+        var urun = await _context.Urunler.FindAsync(id);
+        if (urun is null)
+            return YenilemeSonucu.Hata("Ürün bulunamadı.");
+
+        if (!urun.Aktif || string.IsNullOrWhiteSpace(urun.URL))
+            return YenilemeSonucu.Hata("Bu ürün takip için uygun değil.");
+
+        var gecenSure = DateTime.UtcNow - urun.SonGuncellemeTarihi;
+        if (gecenSure < _yenilemeBekleme)
+        {
+            return new YenilemeSonucu(
+                Yenilendi: false,
+                ZatenGuncel: true,
+                Mesaj: "Bu ürün güncel.",
+                EskiFiyat: urun.SonFiyati,
+                YeniFiyat: urun.SonFiyati,
+                SonGuncellemeTarihi: urun.SonGuncellemeTarihi);
+        }
+
+        try
+        {
+            var detay = await _scraperService.GetUrunDetayAsync(urun.URL);
+
+            if (detay.FiyatSayi <= 0)
+            {
+                _logger.LogWarning(
+                    "[UrunService] Ürün #{Id} için scrape başarılı ama fiyat alınamadı: '{Ham}'",
+                    id, detay.Fiyat);
+                return YenilemeSonucu.Hata("Şu anda fiyat alınamadı, biraz sonra dene.");
+            }
+
+            var eskiFiyat = urun.SonFiyati;
+            await FiyatGuncelleAsync(id, detay.FiyatSayi, stokVar: true);
+
+            return new YenilemeSonucu(
+                Yenilendi: true,
+                ZatenGuncel: false,
+                Mesaj: eskiFiyat == detay.FiyatSayi
+                    ? "Fiyat değişmedi."
+                    : "Fiyat güncellendi.",
+                EskiFiyat: eskiFiyat,
+                YeniFiyat: detay.FiyatSayi,
+                SonGuncellemeTarihi: DateTime.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "[UrunService] Ürün #{Id} yenilenirken hata: {Mesaj}", id, ex.Message);
+            return YenilemeSonucu.Hata("Yenileme başarısız oldu, lütfen tekrar dene.");
+        }
+    }
+
     public async Task<bool> SilAsync(int id)
     {
         var urun = await _context.Urunler.FindAsync(id);
@@ -209,4 +278,20 @@ public class UrunService(
             await EkleAsync(u);
         }
     }
+}
+
+/// <summary>
+/// "Yenile" butonu sonucu — frontend'in göstereceği mesaj ve değerleri taşır.
+/// </summary>
+public sealed record YenilemeSonucu(
+    bool Yenilendi,
+    bool ZatenGuncel,
+    string Mesaj,
+    decimal? EskiFiyat,
+    decimal? YeniFiyat,
+    DateTime SonGuncellemeTarihi)
+{
+    public static YenilemeSonucu Hata(string mesaj) =>
+        new(Yenilendi: false, ZatenGuncel: false, Mesaj: mesaj,
+            EskiFiyat: null, YeniFiyat: null, SonGuncellemeTarihi: DateTime.MinValue);
 }

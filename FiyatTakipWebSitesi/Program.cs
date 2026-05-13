@@ -121,18 +121,23 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 });
 
 // ── Periyodik Job Kayıtları ───────────────────────────────────────────────────
-RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
-    recurringJobId: "fiyat-guncelle-saatlik",
-    methodCall:     job => job.TumUrunlerGuncelleAsync(),
-    cronExpression: Cron.Hourly,
-    options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
-
-// Ayrıca her gün 06:00'da tam güncelleme (saatlik ile aynı metod)
+// Günde 2 kez: 06:00 (sabah) ve 18:00 (akşam). Selenium yükü ve anti-bot
+// riskini düşük tutmak için saatlik tarama yapılmıyor — kullanıcı tek ürünü
+// elle yenilemek isterse UrunService.TekUrunYenileAsync üzerinden tetikler.
 RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
     recurringJobId: "fiyat-guncelle-gunluk-sabah",
     methodCall:     job => job.TumUrunlerGuncelleAsync(),
     cronExpression: "0 6 * * *",
     options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
+    recurringJobId: "fiyat-guncelle-gunluk-aksam",
+    methodCall:     job => job.TumUrunlerGuncelleAsync(),
+    cronExpression: "0 18 * * *",
+    options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+// Eski saatlik job artık kullanılmıyor — Hangfire'dan da silinmesi gerekiyor.
+RecurringJob.RemoveIfExists("fiyat-guncelle-saatlik");
 
 app.MapStaticAssets();
 app.MapControllers();
