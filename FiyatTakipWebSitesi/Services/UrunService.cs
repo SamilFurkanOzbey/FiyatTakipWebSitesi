@@ -303,6 +303,95 @@ public class UrunService(
         _context.Urunler.RemoveRange(hepsi);
         await _context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Sistem katalogunu seed eder: UrunModeli + her modelin N adet site
+    /// listelemesini (Urun) ekler. Fiyatlar boş (0) bırakılır — Hangfire'ın
+    /// FiyatGuncellemeJob'ı 06:00/18:00'de bunları scrape edip doldurur.
+    /// Kullanıcı manuel "Yenile" butonu ile de tetikleyebilir.
+    /// Idempotent: UrunModelleri tablosunda kayıt varsa hiçbir şey yapmaz.
+    /// </summary>
+    public async Task SeedKatalogAsync()
+    {
+        if (await _context.UrunModelleri.AnyAsync()) return;
+
+        var elektronik = await _context.Kategoriler
+            .FirstOrDefaultAsync(k => k.Ad == "Elektronik");
+        if (elektronik is null)
+        {
+            _logger.LogWarning("[Seed] Elektronik kategorisi bulunamadı, katalog seed iptal edildi.");
+            return;
+        }
+
+        // 3 telefon modeli × 4-5 site = 14 listeleme
+        var katalog = new (string Ad, (string Satici, string URL)[] Linkler)[]
+        {
+            ("iPhone 15 128GB", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/apple-iphone-15-128-gb-siyah-p-HBCV00004X9ZCH"),
+                ("Çiçeksepeti", "https://www.ciceksepeti.com/apple-iphone-15-128-gb-apple-turkiye-garantili-kcs475224659"),
+                ("PttAVM",      "https://www.pttavm.com/apple-iphone-15-128-6-gb-ram-5g-apple-turkiye-garantili-p-658112268"),
+                ("Teknosa",     "https://www.teknosa.com/apple-iphone-15-128gb-siyah-p-125079197"),
+            }),
+            ("Samsung Galaxy S24 Ultra 256GB", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/samsung-galaxy-s24-ultra-256-gb-12-gb-ram-samsung-turkiye-garantili-siyah-p-HBCV00005MLL3N"),
+                ("Çiçeksepeti", "https://www.ciceksepeti.com/samsung-galaxy-s24-ultra-256-gb-12-gb-ram-samsung-turkiye-garantili-kcm11436817"),
+                ("PttAVM",      "https://www.pttavm.com/samsung-galaxy-s24-ultra-256-gb-12-gb-ram-samsung-turkiye-garantili-titanyum-siyah-p-1246216559"),
+                ("Teknosa",     "https://www.teknosa.com/samsung-galaxy-s24-ultra-12gb256gb-titanyum-black-akilli-telefon-p-125079454"),
+                ("n11",         "https://www.n11.com/urun/samsung-galaxy-s24-ultra-12-gb-256-gb-samsung-turkiye-garantili-47977817"),
+            }),
+            ("Xiaomi Redmi Note 13 Pro 256GB", new[]
+            {
+                ("Çiçeksepeti", "https://www.ciceksepeti.com/xiaomi-redmi-note-13-pro-8-gb-256-gb-xiaomi-turkiye-garantili-kcm88276666"),
+                ("PttAVM",      "https://www.pttavm.com/xiaomi-redmi-note-13-pro-256-8-gb-ram-xiaomi-turkiye-garantili-p-794300467"),
+                ("Teknosa",     "https://www.teknosa.com/xiaomi-redmi-note-13-pro-8-gb-256-gb-siyah-cep-telefonu-xiaomi-turkiye-garantili-p-780010574"),
+                ("n11",         "https://www.n11.com/urun/xiaomi-redmi-note-13-pro-8-gb-256-gb-xiaomi-turkiye-garantili-48308143"),
+            }),
+        };
+
+        int eklenenModel = 0, eklenenListe = 0;
+
+        foreach (var (modelAdi, linkler) in katalog)
+        {
+            var model = new UrunModeli
+            {
+                Ad = modelAdi,
+                KategoriId = elektronik.Id,
+                OlusturulmaTarihi = DateTime.UtcNow,
+                Aktif = true,
+            };
+            _context.UrunModelleri.Add(model);
+            await _context.SaveChangesAsync(); // model.Id üretilsin
+
+            foreach (var (satici, url) in linkler)
+            {
+                var liste = new Urun
+                {
+                    Ad = modelAdi,                       // Scraper sonradan günceller
+                    URL = url,
+                    Satici = satici,
+                    ParaBirimi = "TRY",
+                    KategoriId = elektronik.Id,
+                    UrunModeliId = model.Id,
+                    UserId = null,                       // Sistem ürünü (kullanıcı eklemesi değil)
+                    BaslangicFiyati = 0,                 // Scraper ilk run'da dolduracak
+                    SonFiyati = 0,
+                    EklendigiTarih = DateTime.UtcNow,
+                    SonGuncellemeTarihi = DateTime.MinValue,  // İlk scrape'i tetikle
+                    Aktif = true,
+                };
+                _context.Urunler.Add(liste);
+                eklenenListe++;
+            }
+            await _context.SaveChangesAsync();
+            eklenenModel++;
+        }
+
+        _logger.LogInformation(
+            "[Seed] Katalog seed tamamlandı — {Model} model, {Liste} listeleme eklendi.",
+            eklenenModel, eklenenListe);
+    }
 }
 
 /// <summary>

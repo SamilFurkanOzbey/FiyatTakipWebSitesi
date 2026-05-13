@@ -27,12 +27,19 @@ public class Urun
     public string ParaBirimi { get; set; } = "TRY";
     
     public int KategoriId { get; set; }
-    
+
     public Kategori? Kategori { get; set; }
-    
+
     public int? UserId { get; set; }
-    
+
     public Kullanici? Kullanici { get; set; }
+
+    // Eğer dolu ise → bu satır katalogdaki bir modelin (UrunModeli) sitedeki
+    // listelemesidir (sistem ürünü). Boş ise → kullanıcının "Takip Ettiklerim"e
+    // elle yapıştırdığı serbest URL'dir (eski mantık, bozulmaz).
+    public int? UrunModeliId { get; set; }
+
+    public UrunModeli? UrunModeli { get; set; }
     
     public decimal BaslangicFiyati { get; set; }
     

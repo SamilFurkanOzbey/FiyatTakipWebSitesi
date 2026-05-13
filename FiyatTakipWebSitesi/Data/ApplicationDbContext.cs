@@ -17,6 +17,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     // Veritabanındaki tabloları temsil eden DbSet'ler
     public DbSet<Kullanici> Kullanicilar { get; set; } = null!;
     public DbSet<Kategori> Kategoriler { get; set; } = null!;
+    public DbSet<UrunModeli> UrunModelleri { get; set; } = null!;
     public DbSet<Urun> Urunler { get; set; } = null!;
     public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; } = null!;
     public DbSet<Uyari> Uyarilar { get; set; } = null!;
@@ -41,6 +42,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany(k => k.Urunler)
             .HasForeignKey(u => u.UserId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Bir Urun satırı (listeleme) opsiyonel olarak bir UrunModeli'ne bağlanır.
+        // Model silinirse, bağlı listelemelerin UrunModeliId'si NULL'a düşürülür
+        // (yani liste kaybolmaz, sadece üst modelle bağı kopar).
+        modelBuilder.Entity<Urun>()
+            .HasOne(u => u.UrunModeli)
+            .WithMany(m => m.Listeler)
+            .HasForeignKey(u => u.UrunModeliId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // UrunModeli kategoriye bağlı. Cascade YOK — çünkü Kategori → Urun de
+        // cascade yapıyor ve SQL Server çoklu cascade yolunu (Kategori → Urun ve
+        // Kategori → UrunModeli → Urun) yasaklıyor. NoAction ile: bir kategoriyi
+        // silmek için önce o kategorideki modelleri silmek gerekir.
+        modelBuilder.Entity<UrunModeli>()
+            .HasOne(m => m.Kategori)
+            .WithMany()
+            .HasForeignKey(m => m.KategoriId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         // Bir fiyat geçmişi kaydı yalnızca bir ürüne aittir.
         // Ürün silinirse, o ürüne ait tüm fiyat geçmişi de silinir (Cascade)
