@@ -30,6 +30,11 @@ public class Urun
     
     public Kategori? Kategori { get; set; }
     
+    /// <summary>Bu ürün hangi modele ait (opsiyonel)</summary>
+    public int? UrunModeliId { get; set; }
+    
+    public UrunModeli? UrunModeli { get; set; }
+    
     public int? UserId { get; set; }
     
     public Kullanici? Kullanici { get; set; }

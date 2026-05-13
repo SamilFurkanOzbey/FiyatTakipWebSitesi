@@ -17,6 +17,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     // Veritabanındaki tabloları temsil eden DbSet'ler
     public DbSet<Kullanici> Kullanicilar { get; set; } = null!;
     public DbSet<Kategori> Kategoriler { get; set; } = null!;
+    public DbSet<UrunModeli> UrunModelleri { get; set; } = null!;
     public DbSet<Urun> Urunler { get; set; } = null!;
     public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; } = null!;
     public DbSet<Uyari> Uyarilar { get; set; } = null!;
@@ -33,6 +34,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany(k => k.Urunler)
             .HasForeignKey(u => u.KategoriId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Bir ürün isteğe bağlı olarak bir modele bağlanabilir.
+        // Model silinirse, ürünün UrunModeliId alanı NULL yapılır (SetNull)
+        modelBuilder.Entity<Urun>()
+            .HasOne(u => u.UrunModeli)
+            .WithMany(m => m.Urunler)
+            .HasForeignKey(u => u.UrunModeliId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // UrunModeli – Kategori ilişkisi
+        modelBuilder.Entity<UrunModeli>()
+            .HasOne(m => m.Kategori)
+            .WithMany()
+            .HasForeignKey(m => m.KategoriId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Bir ürün yalnızca bir kullanıcıya ait olabilir.
         // Kullanıcı silinirse, ürünün UserId alanı NULL yapılır (SetNull)

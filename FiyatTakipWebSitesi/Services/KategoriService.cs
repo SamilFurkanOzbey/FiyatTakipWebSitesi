@@ -31,6 +31,19 @@ public class KategoriService(ApplicationDbContext context)
             .Include(k => k.Urunler.Where(u => u.Aktif))
             .FirstOrDefaultAsync(k => k.Id == id);
 
+    /// <summary>
+    /// Belirli bir kategoriye ait tüm UrunModeli kayıtlarını,
+    /// her modelin satıcı/fiyat listelemeleri (Urunler) ile birlikte döner.
+    /// </summary>
+    public async Task<List<UrunModeli>> GetModellerByKategoriAsync(int kategoriId)
+        => await _context.UrunModelleri
+            .AsNoTracking()
+            .Where(m => m.KategoriId == kategoriId)
+            .Include(m => m.Kategori)
+            .Include(m => m.Urunler.Where(u => u.Aktif))
+            .OrderBy(m => m.Ad)
+            .ToListAsync();
+
     public async Task<Kategori> EkleAsync(Kategori kategori)
     {
         kategori.OlusturulmaTarihi = DateTime.UtcNow;
