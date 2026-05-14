@@ -107,7 +107,7 @@ public class KategorilerController(
                 Resim      = m.Resim,
                 KategoriId = m.KategoriId,
                 KategoriAdi = m.Kategori?.Ad,
-                Listeler   = m.Urunler.Select(u => new ModelListelemesiResponse
+                Listeler   = [.. m.Listeler.Select(u => new ModelListelemesiResponse
                 {
                     Id                   = u.Id,
                     Satici               = u.Satici,
@@ -116,7 +116,7 @@ public class KategorilerController(
                     URL                  = u.URL,
                     Aktif                = u.Aktif,
                     SonGuncellemeTarihi  = u.SonGuncellemeTarihi
-                }).ToList()
+                })]
             });
 
             return Ok(response);

@@ -388,9 +388,12 @@ public class UrunService(
             eklenenModel++;
         }
 
-        _logger.LogInformation(
-            "[Seed] Katalog seed tamamlandı — {Model} model, {Liste} listeleme eklendi.",
-            eklenenModel, eklenenListe);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[Seed] Katalog seed tamamlandı — {Model} model, {Liste} listeleme eklendi.",
+                eklenenModel, eklenenListe);
+        }
     }
 }
 

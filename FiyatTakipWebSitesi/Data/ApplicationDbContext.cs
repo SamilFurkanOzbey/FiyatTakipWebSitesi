@@ -39,30 +39,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // Model silinirse, ürünün UrunModeliId alanı NULL yapılır (SetNull)
         modelBuilder.Entity<Urun>()
             .HasOne(u => u.UrunModeli)
-            .WithMany(m => m.Urunler)
-            .HasForeignKey(u => u.UrunModeliId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        // UrunModeli – Kategori ilişkisi
-        modelBuilder.Entity<UrunModeli>()
-            .HasOne(m => m.Kategori)
-            .WithMany()
-            .HasForeignKey(m => m.KategoriId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // Bir ürün yalnızca bir kullanıcıya ait olabilir.
-        // Kullanıcı silinirse, ürünün UserId alanı NULL yapılır (SetNull)
-        modelBuilder.Entity<Urun>()
-            .HasOne(u => u.Kullanici)
-            .WithMany(k => k.Urunler)
-            .HasForeignKey(u => u.UserId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        // Bir Urun satırı (listeleme) opsiyonel olarak bir UrunModeli'ne bağlanır.
-        // Model silinirse, bağlı listelemelerin UrunModeliId'si NULL'a düşürülür
-        // (yani liste kaybolmaz, sadece üst modelle bağı kopar).
-        modelBuilder.Entity<Urun>()
-            .HasOne(u => u.UrunModeli)
             .WithMany(m => m.Listeler)
             .HasForeignKey(u => u.UrunModeliId)
             .OnDelete(DeleteBehavior.SetNull);
@@ -76,6 +52,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(m => m.KategoriId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        // Bir ürün yalnızca bir kullanıcıya ait olabilir.
+        // Kullanıcı silinirse, ürünün UserId alanı NULL yapılır (SetNull)
+        modelBuilder.Entity<Urun>()
+            .HasOne(u => u.Kullanici)
+            .WithMany(k => k.Urunler)
+            .HasForeignKey(u => u.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
 
         // Bir fiyat geçmişi kaydı yalnızca bir ürüne aittir.
         // Ürün silinirse, o ürüne ait tüm fiyat geçmişi de silinir (Cascade)

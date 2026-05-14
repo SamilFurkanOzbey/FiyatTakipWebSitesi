@@ -40,7 +40,7 @@ public class KategoriService(ApplicationDbContext context)
             .AsNoTracking()
             .Where(m => m.KategoriId == kategoriId)
             .Include(m => m.Kategori)
-            .Include(m => m.Urunler.Where(u => u.Aktif))
+            .Include(m => m.Listeler.Where(u => u.Aktif))
             .OrderBy(m => m.Ad)
             .ToListAsync();
 
