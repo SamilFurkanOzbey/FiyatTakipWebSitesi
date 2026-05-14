@@ -5,6 +5,9 @@ using FiyatTakipWebSitesi.Services;
 using Hangfire;
 using Hangfire.SqlServer;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,9 +15,50 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// ── API Controllers ───────────────────────────────────────────────────────────
+// ── API Controllers & OpenAPI ───────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddOpenApi(options =>
+{
+    // JWT Bearer Auth için OpenAPI Ayarı
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Info.Title = "Fiyat Takip API";
+        document.Info.Version = "v1";
+        return Task.CompletedTask;
+    });
+});
+
+// ── Temel Servisler (Cache & Exception) ───────────────────────────────────────
+builder.Services.AddMemoryCache();
+builder.Services.AddExceptionHandler<FiyatTakipWebSitesi.Filters.GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // IP başına genel limit: dakikada 100 istek
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+            
+    // Scraping gibi maliyetli API uç noktaları için: dakikada 5 istek
+    options.AddFixedWindowLimiter("ScrapingPolicy", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 2;
+        opt.AutoReplenishment = true;
+    });
+});
 
 // ── Veritabanı ────────────────────────────────────────────────────────────────
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -41,6 +85,10 @@ builder.Services.AddHangfireServer(options =>
 {
     options.WorkerCount = 2; // Aynı anda max 2 job (Selenium bellek dostu)
 });
+
+// ── Repositories & Services ───────────────────────────────────────────────────
+builder.Services.AddScoped(typeof(FiyatTakipWebSitesi.Repositories.IRepository<>), typeof(FiyatTakipWebSitesi.Repositories.Repository<>));
+builder.Services.AddSingleton<IEmailService, MockEmailService>();
 
 // ── Uygulama servisleri ───────────────────────────────────────────────────────
 builder.Services.AddScoped<ScraperService>();
@@ -104,12 +152,25 @@ await using (var scope = app.Services.CreateAsyncScope())
 // ── HTTP Pipeline ─────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler(); // Global Exception Handler'ı tetikler
     app.UseHsts();
+}
+else
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("Fiyat Takip API Reference");
+        options.WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient);
+        // Scalar JWT Bearer Authentication Setup
+        options.AddServer(new Scalar.AspNetCore.ScalarServer("https://localhost:7164", "Local server"));
+        options.HideModels();
+    });
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseRateLimiter(); // Yetkilendirmeden ve routing'den önce/sonra eklenebilir, middleware sırası önemli
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

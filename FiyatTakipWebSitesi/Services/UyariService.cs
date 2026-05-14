@@ -12,10 +12,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class UyariService(ApplicationDbContext context, ILogger<UyariService> logger)
+public class UyariService(ApplicationDbContext context, ILogger<UyariService> logger, IEmailService emailService)
 {
     private readonly ApplicationDbContext _context = context;
     private readonly ILogger<UyariService> _logger = logger;
+    private readonly IEmailService _emailService = emailService;
 
     // ── Uyarı Oluşturma ──────────────────────────────────────
 
@@ -49,6 +50,10 @@ public class UyariService(ApplicationDbContext context, ILogger<UyariService> lo
                 "[UyariService] Uyarı oluşturuldu — Kullanıcı: {UserId}, Ürün: {UrunId}, Tip: {Tip}",
                 userId, urunId, tip);
         }
+
+        // Mock e-posta gönderimi
+        var userEmail = $"user{userId}@example.com"; // Gerçek projede veritabanından alınır
+        await _emailService.SendEmailAsync(userEmail, baslik, mesaj);
 
         return uyari;
     }

@@ -84,7 +84,7 @@
         ⭐ Takip Ettiklerim Sayfasına Git
     </NavLink>
 
-    @if (!tumUrunler.Any())
+    @if (!urunVarMi)
     {
         <div class="seed-banner">
             <div class="seed-content">
@@ -480,9 +480,9 @@
 @code {
     // ── Kategori & Ürün Listesi ──
     List<FiyatTakipWebSitesi.Models.Kategori> kategoriler = new();
-    List<FiyatTakipWebSitesi.Models.Urun> tumUrunler = new();
     List<FiyatTakipWebSitesi.Models.Urun> gosterilenUrunler = new();
     FiyatTakipWebSitesi.Models.Kategori? secilenKategori = null;
+    bool urunVarMi = false;
 
     // ── Sıralama ──
     string aktifSiralama = "tarih-desc"; // varsayılan: en yeni
@@ -498,13 +498,14 @@
     protected override async Task OnInitializedAsync()
     {
         kategoriler = await KategoriServisi.GetAllAsync();
-        tumUrunler = await UrunServisi.GetAllAsync();
+        var ornek = await UrunServisi.GetAllAsync(skip: 0, take: 1);
+        urunVarMi = ornek.Any();
 
         if (kategoriler.Any())
-            KategoriToggle(kategoriler.First());
+            await KategoriToggle(kategoriler.First());
     }
 
-    void KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
+    async Task KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
     {
         if (secilenKategori?.Id == kategori.Id)
         {
@@ -514,7 +515,7 @@
         else
         {
             secilenKategori = kategori;
-            var filtre = tumUrunler.Where(x => x.KategoriId == kategori.Id && x.Aktif).ToList();
+            var filtre = await UrunServisi.GetByKategoriAsync(kategori.Id, take: 50);
             gosterilenUrunler = UygulaSimdikiSiralama(filtre);
         }
     }
@@ -640,12 +641,13 @@
         await UrunServisi.SeedOrnekUrunlerAsync();
 
         kategoriler = await KategoriServisi.GetAllAsync();
-        tumUrunler = await UrunServisi.GetAllAsync();
+        var ornek = await UrunServisi.GetAllAsync(skip: 0, take: 1);
+        urunVarMi = ornek.Any();
 
         if (kategoriler.Any())
         {
             secilenKategori = null;
-            KategoriToggle(kategoriler.First());
+            await KategoriToggle(kategoriler.First());
         }
 
         yukleniyor = false;
@@ -660,7 +662,7 @@
 
         await UrunServisi.SeedSifirlaAsync();
 
-        tumUrunler.Clear();
+        urunVarMi = false;
         gosterilenUrunler.Clear();
         secilenKategori = null;
 
