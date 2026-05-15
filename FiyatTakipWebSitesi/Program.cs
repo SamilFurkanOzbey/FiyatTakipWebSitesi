@@ -101,6 +101,13 @@ await using (var scope = app.Services.CreateAsyncScope())
     await urunService.SeedKatalogAsync();
 }
 
+// Türkçe karakterleri ASCII'ye çevirip slug üretir (Hangfire recurring job ID için)
+static string KategoriSlugUret(string ad) =>
+    ad.ToLowerInvariant()
+      .Replace("ı", "i").Replace("ğ", "g").Replace("ü", "u")
+      .Replace("ş", "s").Replace("ö", "o").Replace("ç", "c")
+      .Replace(" & ", "-").Replace(" ", "-");
+
 // ── HTTP Pipeline ─────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
 {
@@ -154,6 +161,26 @@ RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
 
 // Eski saatlik job artık kullanılmıyor — Hangfire'dan da silinmesi gerekiyor.
 RecurringJob.RemoveIfExists("fiyat-guncelle-saatlik");
+
+// Her kategori için "manuel-only" recurring job kaydet.
+// Cron.Yearly: yılda bir kez (Jan 1 00:00) — pratikte manuel-only.
+// Dashboard'da görünür, "Trigger now" ile o kategori için scrape başlatılabilir.
+// NOT: Bu blok UseHangfireDashboard sonrası çalışmalı — yoksa JobStorage henüz
+// initialize edilmemiş olur ve InvalidOperationException atar.
+await using (var katScope = app.Services.CreateAsyncScope())
+{
+    var db = katScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var kategoriler = await db.Kategoriler.ToListAsync();
+    foreach (var kat in kategoriler)
+    {
+        var slug = KategoriSlugUret(kat.Ad);
+        RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
+            recurringJobId: $"kategori-{kat.Id}-{slug}",
+            methodCall:     job => job.KategoriUrunlerGuncelleAsync(kat.Id),
+            cronExpression: Cron.Yearly,
+            options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    }
+}
 
 app.MapStaticAssets();
 app.MapControllers();

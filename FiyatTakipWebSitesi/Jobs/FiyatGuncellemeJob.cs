@@ -1,14 +1,18 @@
 // =====================================================
 // FiyatGuncellemeJob.cs
-// Bu sınıf, Hangfire tarafından periyodik olarak (saatlik
-// veya günlük) tetiklenen arka plan işini tanımlar.
-// Tüm aktif ürünlerin fiyatlarını ScraperService üzerinden
-// çekerek UrunService aracılığıyla veritabanına kaydeder.
-// Tek bir ürünün scraping hatası tüm işi durdurmaz;
-// hatalar loglanıp diğer ürünlere devam edilir.
+// Bu sınıf, Hangfire tarafından periyodik olarak (06:00 ve 18:00)
+// tetiklenen arka plan işini tanımlar.
+// Aktif ürünlerin fiyatlarını ScraperService üzerinden PARALEL olarak
+// (concurrency = MaxParalelScrape) çekerek UrunService aracılığıyla
+// veritabanına kaydeder.
+// İki giriş noktası:
+//   • TumUrunlerGuncelleAsync()           → tüm aktif ürünler (otomatik schedule)
+//   • KategoriUrunlerGuncelleAsync(id)    → sadece bir kategoride (manuel test)
+// Tek bir ürünün scraping hatası tüm işi durdurmaz.
 // =====================================================
 
 using FiyatTakipWebSitesi.Data;
+using FiyatTakipWebSitesi.Models;
 using FiyatTakipWebSitesi.Services;
 using Microsoft.EntityFrameworkCore;
 using Polly;
@@ -22,47 +26,85 @@ public class FiyatGuncellemeJob(
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ILogger<FiyatGuncellemeJob> _logger = logger;
 
+    // Aynı anda kaç ürün paralel scrape edilsin. ScraperService içindeki
+    // SemaphoreSlim ile uyumlu olmalı.
+    private const int MaxParalelScrape = 3;
+
     /// <summary>
-    /// Tüm aktif ürünlerin fiyatlarını sırasıyla scrape eder ve
-    /// veritabanını günceller. Hangfire tarafından saatlik/günlük
-    /// olarak tetiklenir.
+    /// Tüm aktif ürünlerin fiyatlarını paralel olarak günceller.
+    /// Hangfire 06:00 ve 18:00 schedule'larıyla otomatik tetiklenir.
     /// </summary>
     public async Task TumUrunlerGuncelleAsync()
     {
-        if (_logger.IsEnabled(LogLevel.Information))
+        List<Urun> urunler;
+        await using (var listeScope = _scopeFactory.CreateAsyncScope())
         {
-            _logger.LogInformation("[FiyatGuncellemeJob] Periyodik fiyat güncelleme başladı — {Zaman}", DateTime.Now);
+            var db = listeScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            urunler = await db.Urunler
+                .Where(u => u.Aktif && !string.IsNullOrEmpty(u.URL))
+                .ToListAsync();
         }
 
-        // Her job çağrısında yeni bir DI scope aç
-        // (Scoped servisler: DbContext, UrunService, ScraperService)
-        await using var scope = _scopeFactory.CreateAsyncScope();
+        await UrunleriGuncelleAsync(urunler, etiket: "TÜM");
+    }
 
-        var db            = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var urunService   = scope.ServiceProvider.GetRequiredService<UrunService>();
-        var scraperService = scope.ServiceProvider.GetRequiredService<ScraperService>();
-
-        // Aktif, URL'si olan tüm ürünleri çek
-        var urunler = await db.Urunler
-            .Where(u => u.Aktif && !string.IsNullOrEmpty(u.URL))
-            .ToListAsync();
-
-        if (_logger.IsEnabled(LogLevel.Information))
+    /// <summary>
+    /// Sadece belirli bir kategorideki aktif ürünleri günceller.
+    /// Hangfire dashboard'unda "Trigger now" ile manuel tetiklenir
+    /// (otomatik schedule yok — Program.cs'te Cron.Yearly ile kayıtlı).
+    /// </summary>
+    public async Task KategoriUrunlerGuncelleAsync(int kategoriId)
+    {
+        List<Urun> urunler;
+        string kategoriAdi = $"#{kategoriId}";
+        await using (var listeScope = _scopeFactory.CreateAsyncScope())
         {
-            _logger.LogInformation("[FiyatGuncellemeJob] {Adet} aktif ürün bulundu.", urunler.Count);
+            var db = listeScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            urunler = await db.Urunler
+                .Where(u => u.Aktif && u.KategoriId == kategoriId && !string.IsNullOrEmpty(u.URL))
+                .ToListAsync();
+
+            kategoriAdi = await db.Kategoriler
+                .Where(k => k.Id == kategoriId)
+                .Select(k => k.Ad)
+                .FirstOrDefaultAsync() ?? kategoriAdi;
         }
 
+        await UrunleriGuncelleAsync(urunler, etiket: kategoriAdi);
+    }
+
+    /// <summary>
+    /// Verilen ürün listesini paralel olarak scrape eder ve günceller.
+    /// Her iş parçacığı için ayrı DI scope açılır (DbContext thread-safe değil).
+    /// </summary>
+    private async Task UrunleriGuncelleAsync(List<Urun> urunler, string etiket)
+    {
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[FiyatGuncellemeJob] [{Etiket}] Başladı — {Adet} ürün, paralel: {Paralel}",
+                etiket, urunler.Count, MaxParalelScrape);
+        }
+
+        if (urunler.Count == 0) return;
+
+        // Thread-safe sayaçlar
         int basarili = 0, hatali = 0;
 
-        foreach (var urun in urunler)
+        var parallelOptions = new ParallelOptions
         {
+            MaxDegreeOfParallelism = MaxParalelScrape,
+        };
+
+        await Parallel.ForEachAsync(urunler, parallelOptions, async (urun, ct) =>
+        {
+            // HER ITERATION KENDİ DI SCOPE'UNU AÇAR (DbContext thread-safe değil)
+            await using var iterScope = _scopeFactory.CreateAsyncScope();
+            var urunService = iterScope.ServiceProvider.GetRequiredService<UrunService>();
+            var scraperService = iterScope.ServiceProvider.GetRequiredService<ScraperService>();
+
             try
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("[FiyatGuncellemeJob] Scraping başladı — ürün #{Id}: {Ad}", urun.Id, urun.Ad);
-                }
-
                 var retryPolicy = Policy
                     .Handle<Exception>()
                     .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -80,37 +122,34 @@ public class FiyatGuncellemeJob(
                     _logger.LogWarning(
                         "[FiyatGuncellemeJob] Fiyat alınamadı veya sıfır — ürün #{Id}: '{Ham}'",
                         urun.Id, detay.Fiyat);
-                    hatali++;
-                    continue;
+                    Interlocked.Increment(ref hatali);
+                    return;
                 }
-                
-                decimal yeniFiyat = detay.FiyatSayi;
 
-                await urunService.FiyatGuncelleAsync(urun.Id, yeniFiyat, stokVar: true);
+                await urunService.OtomatikGuncelleAsync(urun.Id, detay);
 
                 if (_logger.IsEnabled(LogLevel.Information))
                 {
                     _logger.LogInformation(
                         "[FiyatGuncellemeJob] ✓ Ürün #{Id} güncellendi — Yeni fiyat: {Fiyat:N2} TL",
-                        urun.Id, yeniFiyat);
+                        urun.Id, detay.FiyatSayi);
                 }
-                basarili++;
+                Interlocked.Increment(ref basarili);
             }
             catch (Exception ex)
             {
-                // Tek ürün hatası diğer ürünleri engellemez
                 _logger.LogError(ex,
                     "[FiyatGuncellemeJob] ✗ Ürün #{Id} güncellenirken hata: {Mesaj}",
                     urun.Id, ex.Message);
-                hatali++;
+                Interlocked.Increment(ref hatali);
             }
-        }
+        });
 
         if (_logger.IsEnabled(LogLevel.Information))
         {
             _logger.LogInformation(
-                "[FiyatGuncellemeJob] Tamamlandı — Başarılı: {Basarili}, Hatalı: {Hatali}, Toplam: {Toplam}",
-                basarili, hatali, urunler.Count);
+                "[FiyatGuncellemeJob] [{Etiket}] Tamamlandı — Başarılı: {Basarili}, Hatalı: {Hatali}, Toplam: {Toplam}",
+                etiket, basarili, hatali, urunler.Count);
         }
     }
 }
