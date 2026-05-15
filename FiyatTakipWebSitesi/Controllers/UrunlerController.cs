@@ -7,6 +7,7 @@
 // =====================================================
 
 using FiyatTakipWebSitesi.DTOs;
+using FiyatTakipWebSitesi.Mappers;
 using FiyatTakipWebSitesi.Models;
 using FiyatTakipWebSitesi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -16,39 +17,68 @@ namespace FiyatTakipWebSitesi.Controllers;
 [ApiController]
 [Route("api/urunler")]
 [Produces("application/json")]
-public class UrunlerController : ControllerBase
+public class UrunlerController(UrunService urunService, ILogger<UrunlerController> logger) : ControllerBase
 {
-    private readonly UrunService _urunService;
-    private readonly ILogger<UrunlerController> _logger;
+    private readonly UrunService _urunService = urunService;
+    private readonly ILogger<UrunlerController> _logger = logger;
+    private readonly UrunMapper _mapper = new();
 
-    public UrunlerController(UrunService urunService, ILogger<UrunlerController> logger)
+    // ── GET /api/urunler/ara?q={metin} ───────────────
+    /// <summary>Ürün adına göre autocomplete öneriler döner</summary>
+    [HttpGet("ara")]
+    [ProducesResponseType(typeof(IEnumerable<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Ara([FromQuery] string q = "")
     {
-        _urunService = urunService;
-        _logger = logger;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+                return Ok(Array.Empty<object>());
+
+            var urunler = await _urunService.AraAsync(q, limit: 8);
+            var sonuc = urunler.Select(u => new
+            {
+                u.Id,
+                u.Ad,
+                u.Resim,
+                u.SonFiyati,
+                u.ParaBirimi,
+                Kategori = u.Kategori?.Ad ?? ""
+            });
+            return Ok(sonuc);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ürün araması sırasında hata oluştu. q={Q}", q);
+            return StatusCode(500, new { hata = "Arama sırasında bir hata oluştu." });
+        }
     }
 
     // ── GET /api/urunler ──────────────────────────────
     /// <summary>Tüm aktif ürünleri listeler</summary>
     /// <param name="kategoriId">Opsiyonel: Kategoriye göre filtrele</param>
     /// <param name="kullaniciId">Opsiyonel: Kullanıcıya göre filtrele</param>
+    /// <param name="skip">Atlanacak kayıt sayısı (sayfalama için)</param>
+    /// <param name="take">Alınacak kayıt sayısı (sayfalama için)</param>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<UrunResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? kategoriId,
-        [FromQuery] int? kullaniciId)
+        [FromQuery] int? kullaniciId,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50)
     {
         try
         {
             List<Urun> urunler;
 
             if (kategoriId.HasValue)
-                urunler = await _urunService.GetByKategoriAsync(kategoriId.Value);
+                urunler = await _urunService.GetByKategoriAsync(kategoriId.Value, skip, take);
             else if (kullaniciId.HasValue)
-                urunler = await _urunService.GetByKullaniciAsync(kullaniciId.Value);
+                urunler = await _urunService.GetByKullaniciAsync(kullaniciId.Value); // Kullanıcı filtrelemesinde sayfalama eklenmediyse servise eklenebilir, şimdilik böyle bırakıyoruz
             else
-                urunler = await _urunService.GetAllAsync();
+                urunler = await _urunService.GetAllAsync(skip, take);
 
-            var response = urunler.Select(MapToResponse);
+            var response = urunler.Select(u => _mapper.UrunToUrunResponse(u));
             return Ok(response);
         }
         catch (Exception ex)
@@ -85,7 +115,7 @@ public class UrunlerController : ControllerBase
             };
 
             var eklendi = await _urunService.EkleAsync(urun);
-            var response = MapToResponse(eklendi);
+            var response = _mapper.UrunToUrunResponse(eklendi);
 
             return CreatedAtAction(nameof(GetById), new { id = eklendi.Id }, response);
         }
@@ -109,7 +139,7 @@ public class UrunlerController : ControllerBase
             if (urun is null)
                 return NotFound(new { hata = $"Id={id} olan ürün bulunamadı." });
 
-            return Ok(MapToResponse(urun));
+            return Ok(_mapper.UrunToUrunResponse(urun));
         }
         catch (Exception ex)
         {
@@ -179,22 +209,5 @@ public class UrunlerController : ControllerBase
     }
 
     // ── Yardımcı Dönüşüm Metodu ───────────────────────
-
-    private static UrunResponse MapToResponse(Urun u) => new()
-    {
-        Id = u.Id,
-        Ad = u.Ad,
-        URL = u.URL,
-        Resim = u.Resim,
-        KategoriId = u.KategoriId,
-        KategoriAdi = u.Kategori?.Ad,
-        BaslangicFiyati = u.BaslangicFiyati,
-        SonFiyati = u.SonFiyati,
-        HedefFiyati = u.HedefFiyati,
-        FiyatDususuBildir = u.FiyatDususuBildir,
-        FiyatArtisiiBildir = u.FiyatArtisiiBildir,
-        Aktif = u.Aktif,
-        EklendigiTarih = u.EklendigiTarih,
-        SonGuncellemeTarihi = u.SonGuncellemeTarihi
-    };
+    // Mapperly kullanıldığı için artık manuel mapping'e gerek yoktur.
 }

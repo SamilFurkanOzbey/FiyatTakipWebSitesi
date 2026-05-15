@@ -12,18 +12,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-    {
-    }
-
     // Veritabanındaki tabloları temsil eden DbSet'ler
-    public DbSet<Kullanici> Kullanicilar { get; set; }
-    public DbSet<Kategori> Kategoriler { get; set; }
-    public DbSet<Urun> Urunler { get; set; }
-    public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; }
-    public DbSet<Uyari> Uyarilar { get; set; }
+    public DbSet<Kullanici> Kullanicilar { get; set; } = null!;
+    public DbSet<Kategori> Kategoriler { get; set; } = null!;
+    public DbSet<UrunModeli> UrunModelleri { get; set; } = null!;
+    public DbSet<Urun> Urunler { get; set; } = null!;
+    public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; } = null!;
+    public DbSet<Uyari> Uyarilar { get; set; } = null!;
 
     // Tablo ilişkilerini, kısıtlamaları ve index'leri burada yapılandırıyoruz
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -38,6 +35,24 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(u => u.KategoriId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Bir ürün isteğe bağlı olarak bir modele bağlanabilir.
+        // Model silinirse, ürünün UrunModeliId alanı NULL yapılır (SetNull)
+        modelBuilder.Entity<Urun>()
+            .HasOne(u => u.UrunModeli)
+            .WithMany(m => m.Listeler)
+            .HasForeignKey(u => u.UrunModeliId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // UrunModeli kategoriye bağlı. Cascade YOK — çünkü Kategori → Urun de
+        // cascade yapıyor ve SQL Server çoklu cascade yolunu (Kategori → Urun ve
+        // Kategori → UrunModeli → Urun) yasaklıyor. NoAction ile: bir kategoriyi
+        // silmek için önce o kategorideki modelleri silmek gerekir.
+        modelBuilder.Entity<UrunModeli>()
+            .HasOne(m => m.Kategori)
+            .WithMany()
+            .HasForeignKey(m => m.KategoriId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         // Bir ürün yalnızca bir kullanıcıya ait olabilir.
         // Kullanıcı silinirse, ürünün UserId alanı NULL yapılır (SetNull)
         modelBuilder.Entity<Urun>()
@@ -45,6 +60,7 @@ public class ApplicationDbContext : DbContext
             .WithMany(k => k.Urunler)
             .HasForeignKey(u => u.UserId)
             .OnDelete(DeleteBehavior.SetNull);
+
 
         // Bir fiyat geçmişi kaydı yalnızca bir ürüne aittir.
         // Ürün silinirse, o ürüne ait tüm fiyat geçmişi de silinir (Cascade)

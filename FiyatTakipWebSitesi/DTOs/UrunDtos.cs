@@ -18,6 +18,8 @@ public class UrunResponse
     public string? Resim { get; set; }
     public int KategoriId { get; set; }
     public string? KategoriAdi { get; set; }
+    public string Satici { get; set; } = string.Empty;
+    public string ParaBirimi { get; set; } = "TRY";
     public decimal BaslangicFiyati { get; set; }
     public decimal SonFiyati { get; set; }
     public decimal? HedefFiyati { get; set; }

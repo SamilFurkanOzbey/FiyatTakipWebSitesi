@@ -12,16 +12,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class UyariService
+public class UyariService(ApplicationDbContext context, ILogger<UyariService> logger, IEmailService emailService)
 {
-    private readonly ApplicationDbContext _context;
-    private readonly ILogger<UyariService> _logger;
-
-    public UyariService(ApplicationDbContext context, ILogger<UyariService> logger)
-    {
-        _context = context;
-        _logger  = logger;
-    }
+    private readonly ApplicationDbContext _context = context;
+    private readonly ILogger<UyariService> _logger = logger;
+    private readonly IEmailService _emailService = emailService;
 
     // ── Uyarı Oluşturma ──────────────────────────────────────
 
@@ -49,9 +44,16 @@ public class UyariService
         _context.Uyarilar.Add(uyari);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation(
-            "[UyariService] Uyarı oluşturuldu — Kullanıcı: {UserId}, Ürün: {UrunId}, Tip: {Tip}",
-            userId, urunId, tip);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[UyariService] Uyarı oluşturuldu — Kullanıcı: {UserId}, Ürün: {UrunId}, Tip: {Tip}",
+                userId, urunId, tip);
+        }
+
+        // Mock e-posta gönderimi
+        var userEmail = $"user{userId}@example.com"; // Gerçek projede veritabanından alınır
+        await _emailService.SendEmailAsync(userEmail, baslik, mesaj);
 
         return uyari;
     }
@@ -134,6 +136,7 @@ public class UyariService
     public async Task<List<Uyari>> GetByKullaniciAsync(int kullaniciId, bool? sadeceokunmamis = null)
     {
         var query = _context.Uyarilar
+            .AsNoTracking()
             .Include(u => u.Urun)
             .Where(u => u.UserId == kullaniciId);
 

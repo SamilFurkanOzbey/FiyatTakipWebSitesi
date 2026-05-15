@@ -1,38 +1,41 @@
-﻿@page "/hesap"
+@page "/hesap"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@inject FiyatTakipWebSitesi.Data.ApplicationDbContext DbContext
+@inject FiyatTakipWebSitesi.Services.KullaniciService KullaniciServisi
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
 
 <PageTitle>Hesap</PageTitle>
 
 <div class="hesap-page">
 
-    ```
     <div class="hesap-card">
 
         <div class="avatar">
             👤
         </div>
 
-        <h2>Kullanıcı Hesabı</h2>
+        <h2>@(profil != null ? $"{profil.Ad} {profil.Soyad}" : "Ziyaretçi")</h2>
 
         <p class="mail">
-            ornekmail@gmail.com
+            @(profil?.Email ?? "Giriş yapmadınız")
         </p>
 
         <div class="istatistik">
 
             <div class="box">
-                <h3>12</h3>
+                <h3>@takipEdilenSayisi</h3>
                 <span>Takip Edilen</span>
             </div>
 
             <div class="box">
-                <h3>5</h3>
+                <h3>@bildirimSayisi</h3>
                 <span>Bildirim</span>
             </div>
 
         </div>
 
     </div>
-    ```
 
 </div>
 
@@ -53,10 +56,17 @@
         border-radius: 20px;
         width: 400px;
         text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
 
     .avatar {
         font-size: 5rem;
+    }
+
+    .hesap-card h2 {
+        font-weight: 700;
+        margin-top: 10px;
+        margin-bottom: 5px;
     }
 
     .mail {
@@ -74,11 +84,45 @@
         padding: 20px;
         border-radius: 14px;
         width: 45%;
+        border: 1px solid #334155;
     }
 
-        .box h3 {
-            color: #60a5fa;
-            font-size: 2rem;
-        }
+    .box h3 {
+        color: #60a5fa;
+        font-size: 2rem;
+        margin-bottom: 5px;
+    }
+    
+    .box span {
+        font-size: 0.9rem;
+        color: #cbd5e1;
+    }
 
 </style>
+
+@code {
+    FiyatTakipWebSitesi.DTOs.ProfilResponse? profil;
+    int takipEdilenSayisi = 0;
+    int bildirimSayisi = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ilkKullanici = await DbContext.Kullanicilar.FirstOrDefaultAsync();
+        if (ilkKullanici != null)
+        {
+            profil = await KullaniciServisi.ProfilGetirAsync(ilkKullanici.Id);
+            if (profil != null)
+            {
+                takipEdilenSayisi = profil.TakipEdilenUrunSayisi;
+                bildirimSayisi = profil.OkunmamisUyariSayisi;
+            }
+        }
+        else
+        {
+            // Kullanıcı yoksa sistem geneli dummy istatistikleri
+            var urunler = await UrunServisi.GetAllAsync();
+            takipEdilenSayisi = urunler.Count;
+            bildirimSayisi = await DbContext.Uyarilar.CountAsync();
+        }
+    }
+}

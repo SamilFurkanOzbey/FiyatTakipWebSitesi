@@ -1,0 +1,413 @@
+@page "/model/{Id:int}"
+@rendermode InteractiveServer
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
+@inject NavigationManager NavManager
+<PageTitle>@(model?.Ad ?? "Model")</PageTitle>
+
+<div class="detay-page">
+
+    <button class="geri-btn" @onclick="GeriDon">← Kategorilere Dön</button>
+
+    @if (yukleniyor)
+    {
+        <div class="yukleme">⏳ Yükleniyor...</div>
+    }
+    else if (model is null)
+    {
+        <div class="hata">
+            <h2>Model bulunamadı</h2>
+            <p>Aradığınız model mevcut değil veya silinmiş olabilir.</p>
+        </div>
+    }
+    else
+    {
+        @* ── ÜST: Model bilgisi ── *@
+        <div class="ust-bilgi">
+            <div class="resim-kutu">
+                @{
+                    var resim = !string.IsNullOrEmpty(model.Resim)
+                        ? model.Resim
+                        : model.Listeler.Select(l => l.Resim).FirstOrDefault(r => !string.IsNullOrEmpty(r));
+                }
+                @if (!string.IsNullOrEmpty(resim))
+                {
+                    <img src="@resim" alt="@model.Ad" />
+                }
+                else
+                {
+                    <span class="placeholder">🖼️</span>
+                }
+            </div>
+            <div class="bilgi">
+                <span class="kategori-rozet">📦 @(model.Kategori?.Ad ?? "Diğer")</span>
+                <h1>@model.Ad</h1>
+                @if (!string.IsNullOrEmpty(model.Aciklama))
+                {
+                    <p class="aciklama">@model.Aciklama</p>
+                }
+                <div class="ozet">
+                    @if (enDusuk > 0)
+                    {
+                        <div class="ozet-kart">
+                            <span class="etiket">En Düşük Fiyat</span>
+                            <span class="deger yesil">@enDusuk.ToString("N2", trCulture) ₺</span>
+                        </div>
+                        <div class="ozet-kart">
+                            <span class="etiket">En Yüksek Fiyat</span>
+                            <span class="deger kirmizi">@enYuksek.ToString("N2", trCulture) ₺</span>
+                        </div>
+                        <div class="ozet-kart">
+                            <span class="etiket">Ortalama</span>
+                            <span class="deger">@ortalama.ToString("N2", trCulture) ₺</span>
+                        </div>
+                    }
+                    <div class="ozet-kart">
+                        <span class="etiket">Sitede</span>
+                        <span class="deger">@aktifListeler.Count adet</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ── ALT: Site listelemeleri tablosu ── *@
+        <h2 class="bolum-baslik">🛒 Sitelerdeki Fiyatlar</h2>
+
+        @if (aktifListeler.Count == 0)
+        {
+            <div class="bos-mesaj">
+                Bu modelin hiçbir sitede aktif listelemesi yok.
+            </div>
+        }
+        else
+        {
+            <div class="liste-tablosu">
+                @foreach (var liste in siralanmisListeler)
+                {
+                    var enDusukMu = liste.SonFiyati == enDusuk && enDusuk > 0;
+                    <div class="liste-satir @(enDusukMu ? "en-dusuk" : "")">
+                        <div class="hucre site-hucre">
+                            <span class="site-ikon">@SiteIkon(liste.Satici)</span>
+                            <div class="site-bilgi">
+                                <span class="site-ad">@liste.Satici</span>
+                                @if (enDusukMu)
+                                {
+                                    <span class="rozet-en-iyi">🏆 En İyi Fiyat</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="hucre fiyat-hucre">
+                            @if (liste.SonFiyati > 0)
+                            {
+                                <span class="fiyat-buyuk">@liste.SonFiyati.ToString("N2", trCulture) ₺</span>
+                                <span class="guncelleme">
+                                    @if (liste.SonGuncellemeTarihi == DateTime.MinValue)
+                                    {
+                                        <text>Henüz çekilmedi</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Son: @liste.SonGuncellemeTarihi.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</text>
+                                    }
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="fiyat-yok">Fiyat alınamadı</span>
+                            }
+                        </div>
+
+                        <div class="hucre aksiyon-hucre">
+                            <NavLink href="@($"/urundetay/{liste.Id}")" class="btn-detay">📄 Detay</NavLink>
+                            <NavLink href="@($"/grafik/{liste.Id}")" class="btn-grafik">📊 Grafik</NavLink>
+                            <a href="@liste.URL" target="_blank" rel="noopener" class="btn-git">🔗 Siteye Git</a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<style>
+    body { background: #0f172a; }
+    .detay-page {
+        padding: 28px 36px;
+        max-width: 1200px;
+        margin: 0 auto;
+        color: white;
+    }
+
+    .geri-btn {
+        background: #1e293b;
+        color: #38bdf8;
+        border: 1px solid #334155;
+        padding: 10px 18px;
+        border-radius: 10px;
+        cursor: pointer;
+        margin-bottom: 24px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .geri-btn:hover {
+        background: #334155;
+        border-color: #38bdf8;
+    }
+
+    .yukleme, .hata, .bos-mesaj {
+        padding: 60px;
+        text-align: center;
+        background: #1e293b;
+        border: 1px dashed #475569;
+        border-radius: 16px;
+        color: #94a3b8;
+    }
+
+    /* ── Üst Bilgi ── */
+    .ust-bilgi {
+        display: flex;
+        gap: 32px;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 20px;
+        padding: 28px;
+        margin-bottom: 28px;
+    }
+    .resim-kutu {
+        width: 220px;
+        height: 220px;
+        background: white;
+        border-radius: 16px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .resim-kutu img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        padding: 16px;
+    }
+    .placeholder { font-size: 4rem; opacity: 0.4; }
+    .bilgi { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .kategori-rozet {
+        align-self: flex-start;
+        background: #334155;
+        color: #cbd5e1;
+        padding: 5px 14px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+    .bilgi h1 {
+        font-size: 1.9rem;
+        margin: 0;
+        color: #f1f5f9;
+        line-height: 1.25;
+    }
+    .aciklama { color: #94a3b8; margin: 0; }
+
+    .ozet {
+        display: flex;
+        gap: 14px;
+        margin-top: auto;
+        flex-wrap: wrap;
+    }
+    .ozet-kart {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 12px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 120px;
+    }
+    .etiket { color: #64748b; font-size: 0.78rem; font-weight: 500; }
+    .deger { color: #f1f5f9; font-size: 1.15rem; font-weight: 700; }
+    .yesil { color: #4ade80; }
+    .kirmizi { color: #f87171; }
+
+    /* ── Liste Tablosu ── */
+    .bolum-baslik {
+        font-size: 1.4rem;
+        margin: 28px 0 16px;
+        color: #f1f5f9;
+    }
+    .liste-tablosu {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .liste-satir {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1.5fr;
+        gap: 18px;
+        align-items: center;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 14px;
+        padding: 18px 22px;
+        transition: all 0.2s ease;
+    }
+    .liste-satir:hover {
+        border-color: #475569;
+        transform: translateX(4px);
+    }
+    .liste-satir.en-dusuk {
+        border-color: #4ade80;
+        background: linear-gradient(90deg, rgba(74, 222, 128, 0.08), #1e293b 40%);
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.3);
+    }
+    .hucre { display: flex; flex-direction: column; gap: 4px; }
+
+    .site-hucre { flex-direction: row; align-items: center; gap: 14px; }
+    .site-ikon {
+        font-size: 1.8rem;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0f172a;
+        border-radius: 10px;
+        flex-shrink: 0;
+    }
+    .site-bilgi { display: flex; flex-direction: column; gap: 4px; }
+    .site-ad { color: #f1f5f9; font-weight: 600; font-size: 1rem; }
+    .rozet-en-iyi {
+        background: #16a34a;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        align-self: flex-start;
+    }
+
+    .fiyat-buyuk {
+        color: #38bdf8;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .en-dusuk .fiyat-buyuk { color: #4ade80; }
+    .fiyat-yok { color: #fbbf24; font-style: italic; }
+    .guncelleme { color: #64748b; font-size: 0.78rem; }
+
+    .aksiyon-hucre {
+        flex-direction: row;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .btn-detay, .btn-grafik, .btn-git {
+        text-decoration: none;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .btn-detay { background: #475569; color: white; }
+    .btn-grafik { background: #0284c7; color: white; }
+    .btn-git { background: #16a34a; color: white; }
+    .btn-detay:hover { background: #64748b; color: white; }
+    .btn-grafik:hover { background: #0369a1; color: white; }
+    .btn-git:hover { background: #15803d; color: white; }
+
+    @@media (max-width: 768px) {
+        .ust-bilgi { flex-direction: column; }
+        .resim-kutu { width: 100%; height: 200px; }
+        .liste-satir { grid-template-columns: 1fr; gap: 14px; }
+        .aksiyon-hucre { justify-content: flex-start; }
+    }
+</style>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    FiyatTakipWebSitesi.Models.UrunModeli? model;
+    bool yukleniyor = true;
+
+    List<FiyatTakipWebSitesi.Models.Urun> aktifListeler = new();
+    List<FiyatTakipWebSitesi.Models.Urun> siralanmisListeler = new();
+    decimal enDusuk = 0;
+    decimal enYuksek = 0;
+    decimal ortalama = 0;
+
+    static readonly System.Globalization.CultureInfo trCulture =
+        new System.Globalization.CultureInfo("tr-TR");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ModeliYukle();
+    }
+
+    // URL'deki Id değişirse (kullanıcı başka modele tıklarsa) yeniden yükle
+    protected override async Task OnParametersSetAsync()
+    {
+        if (model?.Id != Id)
+            await ModeliYukle();
+    }
+
+    async Task ModeliYukle()
+    {
+        yukleniyor = true;
+        StateHasChanged();
+
+        model = await UrunServisi.GetModelByIdAsync(Id);
+
+        if (model is not null)
+        {
+            aktifListeler = model.Listeler.Where(l => l.Aktif).ToList();
+            var fiyatliListeler = aktifListeler.Where(l => l.SonFiyati > 0).ToList();
+
+            // En düşükten sırala (yoksa Satici alfabetik)
+            siralanmisListeler = aktifListeler
+                .OrderBy(l => l.SonFiyati > 0 ? 0 : 1)              // önce fiyatlılar
+                .ThenBy(l => l.SonFiyati > 0 ? l.SonFiyati : 0)     // sonra ucuzdan pahalıya
+                .ThenBy(l => l.Satici)
+                .ToList();
+
+            if (fiyatliListeler.Any())
+            {
+                enDusuk = fiyatliListeler.Min(l => l.SonFiyati);
+                enYuksek = fiyatliListeler.Max(l => l.SonFiyati);
+                ortalama = fiyatliListeler.Average(l => l.SonFiyati);
+            }
+            else
+            {
+                enDusuk = 0;
+                enYuksek = 0;
+                ortalama = 0;
+            }
+        }
+
+        yukleniyor = false;
+        StateHasChanged();
+    }
+
+    void GeriDon()
+    {
+        // Modelin kendi kategorisine geri dön (varsa). Kategori yoksa
+        // /kategoriler'e yönlendir, ilk kategoriyi seçer.
+        if (model?.KategoriId > 0)
+            NavManager.NavigateTo($"/kategoriler?kategori={model.KategoriId}");
+        else
+            NavManager.NavigateTo("/kategoriler");
+    }
+
+    // Site adına göre emoji/ikon (logo yerine geçici)
+    static string SiteIkon(string satici) => satici.ToLowerInvariant() switch
+    {
+        var s when s.Contains("hepsi")    => "🟠",
+        var s when s.Contains("çiçek") || s.Contains("cicek") => "🌸",
+        var s when s.Contains("teknosa")  => "🔵",
+        var s when s.Contains("n11")      => "🟣",
+        var s when s.Contains("ptt")      => "🟡",
+        _ => "🏪"
+    };
+}

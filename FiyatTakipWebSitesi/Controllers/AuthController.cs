@@ -19,16 +19,10 @@ namespace FiyatTakipWebSitesi.Controllers;
 [ApiController]
 [Route("api/auth")]
 [Produces("application/json")]
-public class AuthController : ControllerBase
+public class AuthController(KullaniciService kullaniciService, ILogger<AuthController> logger) : ControllerBase
 {
-    private readonly KullaniciService _kullaniciService;
-    private readonly ILogger<AuthController> _logger;
-
-    public AuthController(KullaniciService kullaniciService, ILogger<AuthController> logger)
-    {
-        _kullaniciService = kullaniciService;
-        _logger = logger;
-    }
+    private readonly KullaniciService _kullaniciService = kullaniciService;
+    private readonly ILogger<AuthController> _logger = logger;
 
     // ── POST /api/auth/kayit ──────────────────────────
     /// <summary>Yeni kullanıcı kaydı oluşturur ve JWT token döner</summary>

@@ -14,25 +14,19 @@ using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.DTOs;
 using FiyatTakipWebSitesi.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class KullaniciService
+public class KullaniciService(
+    ApplicationDbContext context,
+    IOptions<JwtSettings> jwtSettings,
+    ILogger<KullaniciService> logger)
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _config;
-    private readonly ILogger<KullaniciService> _logger;
-
-    public KullaniciService(
-        ApplicationDbContext context,
-        IConfiguration config,
-        ILogger<KullaniciService> logger)
-    {
-        _context  = context;
-        _config   = config;
-        _logger   = logger;
-    }
+    private readonly ApplicationDbContext _context = context;
+    private readonly JwtSettings _jwtSettings = jwtSettings.Value;
+    private readonly ILogger<KullaniciService> _logger = logger;
 
     // ── Kayıt ────────────────────────────────────────────────
 
@@ -61,7 +55,10 @@ public class KullaniciService
         _context.Kullanicilar.Add(kullanici);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Yeni kullanıcı kaydoldu: {Email}", kullanici.Email);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Yeni kullanıcı kaydoldu: {Email}", kullanici.Email);
+        }
         return JwtUret(kullanici);
     }
 
@@ -72,8 +69,9 @@ public class KullaniciService
     /// </summary>
     public async Task<AuthResponse> GirisAsync(GirisRequest istek)
     {
+        var email = istek.Email.Trim();
         var kullanici = await _context.Kullanicilar
-            .FirstOrDefaultAsync(k => k.Email == istek.Email.Trim().ToLowerInvariant());
+            .FirstOrDefaultAsync(k => string.Equals(k.Email, email, StringComparison.OrdinalIgnoreCase));
 
         if (kullanici is null || kullanici.SifreHash is null || kullanici.SifreTuzu is null)
             throw new UnauthorizedAccessException("E-posta veya şifre hatalı.");
@@ -87,7 +85,10 @@ public class KullaniciService
         kullanici.SonGirisTarihi = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Kullanıcı giriş yaptı: {Email}", kullanici.Email);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Kullanıcı giriş yaptı: {Email}", kullanici.Email);
+        }
         return JwtUret(kullanici);
     }
 
@@ -99,6 +100,7 @@ public class KullaniciService
     public async Task<ProfilResponse?> ProfilGetirAsync(int kullaniciId)
     {
         var kullanici = await _context.Kullanicilar
+            .AsNoTracking()
             .Include(k => k.Urunler.Where(u => u.Aktif))
             .Include(k => k.Uyarilar.Where(u => !u.Okundu))
             .FirstOrDefaultAsync(k => k.Id == kullaniciId);
@@ -142,7 +144,10 @@ public class KullaniciService
         kullanici.SifreTuzu  = yeniTuz;
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Kullanıcı {Id} şifresini değiştirdi.", kullaniciId);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Kullanıcı {Id} şifresini değiştirdi.", kullaniciId);
+        }
         return true;
     }
 
@@ -150,10 +155,10 @@ public class KullaniciService
 
     private AuthResponse JwtUret(Kullanici kullanici)
     {
-        var jwtKey    = _config["Jwt:Key"]      ?? throw new InvalidOperationException("JWT Key yapılandırılmamış.");
-        var issuer    = _config["Jwt:Issuer"]   ?? "FiyatTakipWebSitesi";
-        var audience  = _config["Jwt:Audience"] ?? "FiyatTakipKullanicilari";
-        var expMinutes = int.TryParse(_config["Jwt:ExpireMinutes"], out var m) ? m : 1440;
+        var jwtKey    = _jwtSettings.Key;
+        var issuer    = _jwtSettings.Issuer;
+        var audience  = _jwtSettings.Audience;
+        var expMinutes = _jwtSettings.ExpireMinutes;
 
         var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);

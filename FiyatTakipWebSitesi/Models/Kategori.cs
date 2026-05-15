@@ -22,5 +22,5 @@ public class Kategori
     public DateTime OlusturulmaTarihi { get; set; } = DateTime.UtcNow;
     
     // Relations
-    public ICollection<Urun> Urunler { get; set; } = new List<Urun>();
+    public ICollection<Urun> Urunler { get; set; } = [];
 }

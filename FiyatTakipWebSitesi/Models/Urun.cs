@@ -22,13 +22,24 @@ public class Urun
     
     public string? Resim { get; set; }
     
+    public string Satici { get; set; } = string.Empty;
+    
+    public string ParaBirimi { get; set; } = "TRY";
+    
     public int KategoriId { get; set; }
-    
+
     public Kategori? Kategori { get; set; }
-    
+
     public int? UserId { get; set; }
-    
+
     public Kullanici? Kullanici { get; set; }
+
+    // Eğer dolu ise → bu satır katalogdaki bir modelin (UrunModeli) sitedeki
+    // listelemesidir (sistem ürünü). Boş ise → kullanıcının "Takip Ettiklerim"e
+    // elle yapıştırdığı serbest URL'dir (eski mantık, bozulmaz).
+    public int? UrunModeliId { get; set; }
+
+    public UrunModeli? UrunModeli { get; set; }
     
     public decimal BaslangicFiyati { get; set; }
     
@@ -48,7 +59,7 @@ public class Urun
     public decimal? HedefFiyati { get; set; }
     
     // Relations
-    public ICollection<FiyatGecmisi> FiyatGecmisleri { get; set; } = new List<FiyatGecmisi>();
+    public ICollection<FiyatGecmisi> FiyatGecmisleri { get; set; } = [];
     
-    public ICollection<Uyari> Uyarilar { get; set; } = new List<Uyari>();
+    public ICollection<Uyari> Uyarilar { get; set; } = [];
 }
