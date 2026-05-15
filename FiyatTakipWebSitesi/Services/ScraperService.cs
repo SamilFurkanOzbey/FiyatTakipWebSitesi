@@ -9,16 +9,11 @@ namespace FiyatTakipWebSitesi.Services;
 
 public partial class ScraperService(ILogger<ScraperService> logger)
 {
-<<<<<<< HEAD
     private readonly ILogger<ScraperService> _logger = logger;
-    private static readonly SemaphoreSlim _slot = new(2, 2);
-=======
-    private readonly ILogger<ScraperService> _logger;
     // Aynı anda en fazla kaç Chrome instance açık olabilir. FiyatGuncellemeJob'daki
     // MaxParalelScrape ile uyumlu olmalı — orası 3 iken burası 2 olursa
     // job'da darboğaz oluşur.
     private static readonly SemaphoreSlim _slot = new(3, 3);
->>>>>>> f6495d9b0ab8745a9691ed149ed543146a578ca9
     private static readonly System.Globalization.CultureInfo _tr = new("tr-TR");
     private static readonly System.Globalization.CultureInfo _inv = System.Globalization.CultureInfo.InvariantCulture;
 
@@ -753,9 +748,12 @@ public partial class ScraperService(ILogger<ScraperService> logger)
                 // Detay: PttavmAnaSaticiAktif yorumuna bak.
                 if (site == Site.Pttavm && !PttavmAnaSaticiAktif(pageSource))
                 {
-                    _logger.LogInformation(
-                        "[PttAVM] Ana satıcı pasif (Satıcıya Sor / Benzer Ürünleri Gör) → fiyat alma | {Url}",
-                        url);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation(
+                            "[PttAVM] Ana satıcı pasif (Satıcıya Sor / Benzer Ürünleri Gör) → fiyat alma | {Url}",
+                            url);
+                    }
                     return "Fiyat bulunamadı";
                 }
 
@@ -877,9 +875,12 @@ public partial class ScraperService(ILogger<ScraperService> logger)
                 // mantığı bunu pasifleştirir.
                 if (site == Site.Pttavm && !PttavmAnaSaticiAktif(pageSource))
                 {
-                    _logger.LogInformation(
-                        "[PttAVM] Ana satıcı pasif (Satıcıya Sor / Benzer Ürünleri Gör) → fiyat alma | {Url}",
-                        url);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation(
+                            "[PttAVM] Ana satıcı pasif (Satıcıya Sor / Benzer Ürünleri Gör) → fiyat alma | {Url}",
+                            url);
+                    }
                     return new UrunDetay { Url = url };
                 }
 
@@ -1120,23 +1121,6 @@ public partial class ScraperService(ILogger<ScraperService> logger)
         }));
 
 
-public class UrunKart
-{
-    public string Ad { get; set; } = "";
-    public string Fiyat { get; set; } = "";
-    public string ResimUrl { get; set; } = "";
-    public string UrunUrl { get; set; } = "";
-}
-
-public class UrunDetay
-{
-    public string Url { get; set; } = "";
-    public string Ad { get; set; } = "İsimsiz Ürün";
-    public string Fiyat { get; set; } = "";
-    public decimal FiyatSayi { get; set; }
-    public string ResimUrl { get; set; } = "";
-    public string Satici { get; set; } = "Bilinmiyor";
-}
 
     [GeneratedRegex(@"-p[a-z]*-[A-Za-z0-9]", RegexOptions.IgnoreCase)]
     private static partial Regex HbUrunRegex();
@@ -1176,4 +1160,22 @@ public class UrunDetay
 
     [GeneratedRegex(@"Sepete\s*özel\s*fiyat[\s\S]{0,300}?(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*TL", RegexOptions.IgnoreCase)]
     private static partial Regex SepeteOzelFiyatRegex();
+}
+
+public class UrunKart
+{
+    public string Ad { get; set; } = "";
+    public string Fiyat { get; set; } = "";
+    public string ResimUrl { get; set; } = "";
+    public string UrunUrl { get; set; } = "";
+}
+
+public class UrunDetay
+{
+    public string Url { get; set; } = "";
+    public string Ad { get; set; } = "İsimsiz Ürün";
+    public string Fiyat { get; set; } = "";
+    public decimal FiyatSayi { get; set; }
+    public string ResimUrl { get; set; } = "";
+    public string Satici { get; set; } = "Bilinmiyor";
 }
