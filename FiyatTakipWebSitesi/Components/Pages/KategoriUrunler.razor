@@ -1,5 +1,7 @@
-﻿@page "/kategoriler"
+@page "/kategoriler"
 @rendermode InteractiveServer
+@inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
 <PageTitle>Kategoriler</PageTitle>
 
 <div class="kategori-page">
@@ -7,34 +9,41 @@
         <h3>Kategoriler</h3>
         @foreach (var kategori in kategoriler)
         {
-            <div class="kategori-item @(secilenKategori == kategori ? "active" : "")"
+            <div class="kategori-item @(secilenKategori?.Id == kategori.Id ? "active" : "")"
                  @onclick="() => KategoriSec(kategori)">
-                @kategori
+                @kategori.Ad
             </div>
         }
     </div>
 
     <div class="content">
-        @if (string.IsNullOrEmpty(secilenKategori))
+        @if (secilenKategori == null)
         {
             <h2>Kategori Seçiniz</h2>
             <p>Ürünleri listelemek için soldan bir başlığa tıklayın.</p>
         }
         else
         {
-            <h2>@secilenKategori Bölümü</h2>
+            <h2>@secilenKategori.Ad Bölümü</h2>
             @if (filtreliUrunler.Any())
             {
                 <div class="urun-grid">
                     @foreach (var urun in filtreliUrunler)
                     {
                         <div class="urun-card">
-                            <img src="@urun.Resim" />
+                            @if (!string.IsNullOrEmpty(urun.Resim))
+                            {
+                                <img src="@urun.Resim" alt="@urun.Ad" />
+                            }
+                            else
+                            {
+                                <div class="resim-placeholder">🖼️</div>
+                            }
                             <h4>@urun.Ad</h4>
-                            <p class="fiyat">@urun.Fiyat</p>
+                            <p class="fiyat">@urun.SonFiyati.ToString("N2") @urun.ParaBirimi</p>
                             <div class="btn-row">
-                                <NavLink href="/UrunDetaySayfasi" class="detay-btn">Detay</NavLink>
-                                <NavLink href="/Analiz" class="grafik-btn">Grafik</NavLink>
+                                <NavLink href="@($"/urundetay/{urun.Id}")" class="detay-btn">Detay</NavLink>
+                                <NavLink href="@($"/grafik/{urun.Id}")" class="grafik-btn">Grafik</NavLink>
                             </div>
                         </div>
                     }
@@ -57,41 +66,33 @@
     .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
     .urun-card { background: #1e293b; padding: 15px; border-radius: 15px; border: 1px solid #334155; }
     .urun-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 10px; }
+    .resim-placeholder { width: 100%; height: 200px; background: #0f172a; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 3rem; }
     .fiyat { color: #38bdf8; font-weight: bold; }
     .btn-row { display: flex; gap: 8px; margin-top: 15px; }
-    .detay-btn { background: #475569; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; }
-    .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; }
+    .detay-btn { background: #475569; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; transition: background 0.2s; }
+    .detay-btn:hover { background: #64748b; }
+    .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; transition: background 0.2s; }
+    .grafik-btn:hover { background: #0369a1; }
     .bos-mesaj { padding: 40px; text-align:center; color: #94a3b8; }
 </style>
 
 @code {
-    List<string> kategoriler = new() { "Elektronik", "Moda", "Ev", "Spor", "Kitap", "Kozmetik" };
-    List<Urun> tumUrunler = new();
-    List<Urun> filtreliUrunler = new();
-    string secilenKategori = "";
+    List<FiyatTakipWebSitesi.Models.Kategori> kategoriler = new();
+    List<FiyatTakipWebSitesi.Models.Urun> filtreliUrunler = new();
+    FiyatTakipWebSitesi.Models.Kategori? secilenKategori;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        string[] elektronikler = { "iPhone 15", "MacBook Air", "Sony WH-1000XM5", "Logitech G502", "Razer BlackWidow", "Samsung Odyssey G7", "iPad Pro", "Apple Watch S9", "Samsung T7 SSD", "Logitech C920", "JBL Flip 6", "Meta Quest 3" };
-        string[] modalar = { "Siyah Trençkot", "Oversize Hoodie", "Air Jordan 1", "Basic Beyaz Tişört", "Slim Fit Gömlek", "Chelsea Bot", "Ray-Ban Wayfarer", "North Face Çanta", "V Yaka Kazak", "Chino Pantolon", "Gece Elbisesi", "Kolombiya Mont" };
-
-        for (int i = 0; i < 12; i++)
+        kategoriler = await KategoriServisi.GetAllAsync();
+        if (kategoriler.Any())
         {
-            tumUrunler.Add(new Urun { Ad = elektronikler[i], Fiyat = "15.000 TL", Kategori = "Elektronik", Resim = $"https://picsum.photos/400/300?random=e{i}" });
-            tumUrunler.Add(new Urun { Ad = modalar[i], Fiyat = "2.500 TL", Kategori = "Moda", Resim = $"https://picsum.photos/400/500?random=m{i}" });
+            await KategoriSec(kategoriler.First());
         }
     }
 
-    void KategoriSec(string kategori)
+    async Task KategoriSec(FiyatTakipWebSitesi.Models.Kategori kategori)
     {
         secilenKategori = kategori;
-        filtreliUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
-    }
-
-    class Urun {
-        public string Ad { get; set; } = "";
-        public string Fiyat { get; set; } = "";
-        public string Kategori { get; set; } = "";
-        public string Resim { get; set; } = "";
+        filtreliUrunler = await UrunServisi.GetByKategoriAsync(kategori.Id);
     }
 }

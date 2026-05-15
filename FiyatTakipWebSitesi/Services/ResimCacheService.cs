@@ -3,18 +3,11 @@ using System.Text;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class ResimCacheService
+public class ResimCacheService(IWebHostEnvironment env, HttpClient httpClient, ILogger<ResimCacheService> logger)
 {
-    private readonly IWebHostEnvironment _env;
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<ResimCacheService> _logger;
-
-    public ResimCacheService(IWebHostEnvironment env, HttpClient httpClient, ILogger<ResimCacheService> logger)
-    {
-        _env = env;
-        _httpClient = httpClient;
-        _logger = logger;
-    }
+    private readonly IWebHostEnvironment _env = env;
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly ILogger<ResimCacheService> _logger = logger;
 
     public async Task<string?> ResimOnbellegeAlAsync(string? resimUrl)
     {

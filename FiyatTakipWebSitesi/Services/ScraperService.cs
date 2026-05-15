@@ -3,12 +3,13 @@ using OpenQA.Selenium.Chrome;
 using HtmlAgilityPack;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class ScraperService
+public partial class ScraperService(ILogger<ScraperService> logger)
 {
-    private readonly ILogger<ScraperService> _logger;
+    private readonly ILogger<ScraperService> _logger = logger;
     private static readonly SemaphoreSlim _slot = new(2, 2);
     private static readonly System.Globalization.CultureInfo _tr = new("tr-TR");
     private static readonly System.Globalization.CultureInfo _inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -24,8 +25,6 @@ public class ScraperService
     ];
 
     private static string RastgeleUserAgent() => _userAgents[Random.Shared.Next(_userAgents.Length)];
-
-    public ScraperService(ILogger<ScraperService> logger) => _logger = logger;
 
     private static ChromeOptions ChromeAyarlari()
     {
@@ -56,7 +55,7 @@ public class ScraperService
     // Akıllı bekleme — sabit 5sn yerine, hedef selectorlar gelene kadar bekle
     // En geç maxSaniye sonra döner (timeout olsa bile patlamaz)
     // ─────────────────────────────────────────────────────────
-    private static async Task SelectorBekleAsync(IWebDriver driver, By[] selectors, int maxSaniye = 15)
+    private static async Task SelectorBekleAsync(ChromeDriver driver, By[] selectors, int maxSaniye = 15)
     {
         var bitis = DateTime.UtcNow.AddSeconds(maxSaniye);
         while (DateTime.UtcNow < bitis)
@@ -140,14 +139,14 @@ public class ScraperService
         {
             // Hepsiburada ürün URL kalıpları:
             //   -p-HBVxxxx, -pm-HBCxxxx, -p-SPORDELTA1903-S vb.
-            if (!Regex.IsMatch(uri.AbsolutePath, @"-p[a-z]*-[A-Za-z0-9]", RegexOptions.IgnoreCase))
+            if (!HbUrunRegex().IsMatch(uri.AbsolutePath))
                 return "Bu link bir ürün sayfası değil (kategori veya başka bir sayfa olabilir). " +
                        "Lütfen tekil bir ürünün detay sayfasının linkini yapıştırın.";
         }
         else if (site == Site.Ciceksepeti)
         {
             // Çiçeksepeti ürün URL kalıbı: /<slug>-<harfler><sayılar>
-            if (!Regex.IsMatch(uri.AbsolutePath, @"-[a-z]+\d+/?$", RegexOptions.IgnoreCase))
+            if (!CiceksepetiUrunRegex().IsMatch(uri.AbsolutePath))
                 return "Bu link bir ürün sayfası değil (kategori veya başka bir sayfa olabilir). " +
                        "Lütfen tekil bir ürünün detay sayfasının linkini yapıştırın.";
         }
@@ -155,7 +154,7 @@ public class ScraperService
         {
             // Teknosa ürün URL kalıbı: /<slug>-p-<sayılar>
             // Örn: /huawei-freebuds-se-2-beyaz-bluetooth-kulaklik-p-780292169
-            if (!Regex.IsMatch(uri.AbsolutePath, @"-p-\d+/?$", RegexOptions.IgnoreCase))
+            if (!TeknosaUrunRegex().IsMatch(uri.AbsolutePath))
                 return "Bu link bir ürün sayfası değil (kategori veya başka bir sayfa olabilir). " +
                        "Lütfen tekil bir ürünün detay sayfasının linkini yapıştırın.";
         }
@@ -163,7 +162,7 @@ public class ScraperService
         {
             // n11 ürün URL kalıbı: /urun/<slug>-<sayılar>
             // Örn: /urun/bioderma-photoderm-spf-50-...-34727879
-            if (!Regex.IsMatch(uri.AbsolutePath, @"^/urun/.+-\d+/?$", RegexOptions.IgnoreCase))
+            if (!N11UrunRegex().IsMatch(uri.AbsolutePath))
                 return "Bu link bir ürün sayfası değil (kategori veya başka bir sayfa olabilir). " +
                        "Lütfen tekil bir ürünün detay sayfasının linkini yapıştırın.";
         }
@@ -171,7 +170,7 @@ public class ScraperService
         {
             // PttAVM ürün URL kalıbı: /<slug>-p-<sayılar>
             // Örn: /apple-airpods-4-nesil-apple-turkiye-garantili-p-1451724108
-            if (!Regex.IsMatch(uri.AbsolutePath, @"-p-\d+/?$", RegexOptions.IgnoreCase))
+            if (!PttavmUrunRegex().IsMatch(uri.AbsolutePath))
                 return "Bu link bir ürün sayfası değil (kategori veya başka bir sayfa olabilir). " +
                        "Lütfen tekil bir ürünün detay sayfasının linkini yapıştırın.";
         }
@@ -209,7 +208,7 @@ public class ScraperService
     // ─────────────────────────────────────────────────────────
     // TEŞHİS — başarısız scrape'ten sonra ne döndüğünü logla
     // ─────────────────────────────────────────────────────────
-    private void TeshisLogla(string url, IWebDriver driver, string pageSource)
+    private void TeshisLogla(string url, ChromeDriver driver, string pageSource)
     {
         try
         {
@@ -245,7 +244,7 @@ public class ScraperService
             if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
             
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var dosyaAdiBase = $"error_{timestamp}_{Guid.NewGuid().ToString().Substring(0,4)}";
+            var dosyaAdiBase = $"error_{timestamp}_{Guid.NewGuid().ToString()[..4]}";
             
             File.WriteAllText(Path.Combine(logDir, $"{dosyaAdiBase}.html"), pageSource);
             
@@ -297,22 +296,21 @@ public class ScraperService
         var detay = new UrunDetay();
 
         // Title — ilk eşleşme genelde ürün adı (HTML escape decode et)
-        var titleMatch = Regex.Match(pageSource, @"""title"":""([^""\\]*(?:\\.[^""\\]*)*)""");
+        var titleMatch = N11TitleRegex().Match(pageSource);
         if (titleMatch.Success)
         {
             var ad = System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value);
             // " Fiyatları ve Özellikleri" suffix'ini kaldır
-            ad = Regex.Replace(ad, @"\s*Fiyatları ve Özellikleri\s*$", "",
-                RegexOptions.IgnoreCase).Trim();
+            ad = N11TitleSuffixRegex().Replace(ad, "").Trim();
             if (!string.IsNullOrEmpty(ad)) detay.Ad = ad;
         }
 
         // Fiyat — "price":"890,01 TL"
-        var priceMatch = Regex.Match(pageSource, @"""price"":""(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?\s*TL)""");
+        var priceMatch = N11PriceRegex().Match(pageSource);
         if (priceMatch.Success) detay.Fiyat = priceMatch.Groups[1].Value;
 
         // priceFloat — sayısal değer ("priceFloat":890.01)
-        var floatMatch = Regex.Match(pageSource, @"""priceFloat"":(\d+(?:\.\d+)?)");
+        var floatMatch = N11PriceFloatRegex().Match(pageSource);
         if (floatMatch.Success &&
             decimal.TryParse(floatMatch.Groups[1].Value,
                 System.Globalization.NumberStyles.Any,
@@ -321,15 +319,14 @@ public class ScraperService
 
         // Resim — "images":[{"path":"https://n11scdn..../{0}/..."}]
         // {0} placeholder'ını "org" ile değiştir (orijinal kalite)
-        var imgMatch = Regex.Match(pageSource,
-            @"""images"":\[\s*\{\s*[^}]*?""path"":""(https://n11scdn[^""]+?IMG-[^""]+?)""");
+        var imgMatch = N11ImageRegex().Match(pageSource);
         if (imgMatch.Success)
             detay.ResimUrl = imgMatch.Groups[1].Value.Replace("{0}", "org");
 
         // Satıcı — "nickName" alanı (ana satıcı bloğunda)
         // Not: "sellerNickName" (diğer mağazalar) ve "sellerNickname" (yorumlar) ile karışmıyor —
         // o alanlardaki büyük/küçük harf farkları nedeniyle bu regex sadece ana satıcıyı yakalar
-        var sellerMatch = Regex.Match(pageSource, @"""nickName""\s*:\s*""([^""]+)""");
+        var sellerMatch = N11SellerRegex().Match(pageSource);
         if (sellerMatch.Success) detay.Satici = sellerMatch.Groups[1].Value;
 
         // Hiçbir şey bulunamadıysa null dön
@@ -339,7 +336,7 @@ public class ScraperService
     }
 
     // Sayfanın ana satıcısını (buy-box) DOM'dan al
-    private static string? BuyBoxSatici(IWebDriver driver)
+    private static string? BuyBoxSatici(ChromeDriver driver)
     {
         try
         {
@@ -593,8 +590,7 @@ public class ScraperService
 
         // Daha esnek Regex: 1.250,00 TL, 1250 TL, 1.250 veya sadece 1250 gibi sayısal formatları bulur.
         // Fiyat etiketleri içindeki (TL, ₺, TRY olsun veya olmasın) geçerli tutarları yakalar.
-        var matches = Regex.Matches(text, @"(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)(?:\s*(?:TL|₺|TRY))?",
-            RegexOptions.IgnoreCase);
+        var matches = FiyatParseRegex().Matches(text);
 
         var fiyatlar = new List<decimal>();
         foreach (Match m in matches)
@@ -641,9 +637,7 @@ public class ScraperService
     // ─────────────────────────────────────────────────────────
     private static string? SepeteOzelFiyat(string pageSource)
     {
-        var match = Regex.Match(pageSource,
-            @"Sepete\s*özel\s*fiyat[\s\S]{0,300}?(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*TL",
-            RegexOptions.IgnoreCase);
+        var match = SepeteOzelFiyatRegex().Match(pageSource);
         if (!match.Success) return null;
 
         var temiz = match.Groups[1].Value.Replace(".", "").Replace(",", ".");
@@ -658,7 +652,7 @@ public class ScraperService
     // data-test-id — son çare fallback
     // Hepsiburada sık değiştiriyor, sadece üsttekiler başarısız olursa kullanılır
     // ─────────────────────────────────────────────────────────
-    private static string FiyatCekFallback(IWebDriver driver)
+    private static string FiyatCekFallback(ChromeDriver driver)
     {
         var defaultPrice = driver.FindElements(By.CssSelector("[data-test-id='default-price']"));
         if (defaultPrice.Count > 0)
@@ -701,17 +695,17 @@ public class ScraperService
                 using var driver = DriverOlustur();
                 driver.Navigate().GoToUrl(url);
 
-                var beklemeSelectors = site == Site.Hepsiburada
-                    ? new[] {
+                By[] beklemeSelectors = site == Site.Hepsiburada
+                    ? [
                         By.CssSelector("script[type='application/ld+json']"),
                         By.CssSelector("[itemprop='price']"),
                         By.CssSelector("[data-test-id='buyBox-seller']")
-                      }
-                    : new[] {
+                      ]
+                    : [
                         By.CssSelector("script[type='application/ld+json']"),
                         By.CssSelector("[itemprop='price']"),
                         By.CssSelector("h1")
-                      };
+                      ];
                 await SelectorBekleAsync(driver, beklemeSelectors, 15);
 
                 var pageSource = driver.PageSource;
@@ -730,8 +724,11 @@ public class ScraperService
                     var n11Detay = N11SayfaParse(pageSource);
                     if (n11Detay != null && !string.IsNullOrEmpty(n11Detay.Fiyat))
                     {
-                        _logger.LogInformation("[n11-SayfaParse] {Fiyat} ({Satici}) | {Url}",
-                            n11Detay.Fiyat, n11Detay.Satici, url);
+                        if (_logger.IsEnabled(LogLevel.Information))
+                        {
+                            _logger.LogInformation("[n11-SayfaParse] {Fiyat} ({Satici}) | {Url}",
+                                n11Detay.Fiyat, n11Detay.Satici, url);
+                        }
                         return n11Detay.Fiyat;
                     }
                 }
@@ -740,8 +737,11 @@ public class ScraperService
                 var jsonLd = JsonLdParse(pageSource, hedefSatici);
                 if (jsonLd != null && !string.IsNullOrEmpty(jsonLd.Fiyat))
                 {
-                    _logger.LogInformation("[JSON-LD] {Fiyat} ({Satici}) | {Url}",
-                        jsonLd.Fiyat, jsonLd.Satici, url);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation("[JSON-LD] {Fiyat} ({Satici}) | {Url}",
+                            jsonLd.Fiyat, jsonLd.Satici, url);
+                    }
                     return jsonLd.Fiyat;
                 }
 
@@ -751,7 +751,10 @@ public class ScraperService
                     var sepetOzel = SepeteOzelFiyat(pageSource);
                     if (sepetOzel != null)
                     {
-                        _logger.LogInformation("[SepeteOzel] {Fiyat} | {Url}", sepetOzel, url);
+                        if (_logger.IsEnabled(LogLevel.Information))
+                        {
+                            _logger.LogInformation("[SepeteOzel] {Fiyat} | {Url}", sepetOzel, url);
+                        }
                         return sepetOzel;
                     }
                 }
@@ -760,7 +763,10 @@ public class ScraperService
                 var itemProp = ItemPropFiyat(pageSource);
                 if (itemProp != null)
                 {
-                    _logger.LogInformation("[itemprop] {Fiyat} | {Url}", itemProp, url);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation("[itemprop] {Fiyat} | {Url}", itemProp, url);
+                    }
                     return itemProp;
                 }
 
@@ -770,7 +776,10 @@ public class ScraperService
                     var fallback = FiyatCekFallback(driver);
                     if (fallback == "Fiyat bulunamadı")
                         TeshisLogla(url, driver, pageSource);
-                    _logger.LogInformation("[fallback] {Fiyat} | {Url}", fallback, url);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation("[fallback] {Fiyat} | {Url}", fallback, url);
+                    }
                     return fallback;
                 }
 
@@ -798,17 +807,17 @@ public class ScraperService
                 driver.Navigate().GoToUrl(url);
 
                 // Akıllı bekleme: site bazlı bekleme selector'ları
-                var beklemeSelectors = site == Site.Hepsiburada
-                    ? new[] {
+                By[] beklemeSelectors = site == Site.Hepsiburada
+                    ? [
                         By.CssSelector("script[type='application/ld+json']"),
                         By.CssSelector("[itemprop='price']"),
                         By.CssSelector("[data-test-id='buyBox-seller']")
-                      }
-                    : new[] {
+                      ]
+                    : [
                         By.CssSelector("script[type='application/ld+json']"),
                         By.CssSelector("[itemprop='price']"),
                         By.CssSelector("h1")
-                      };
+                      ];
                 await SelectorBekleAsync(driver, beklemeSelectors, 15);
 
                 var pageSource = driver.PageSource;
@@ -830,20 +839,26 @@ public class ScraperService
                 {
                     // n11'de Product JSON-LD YOK, sayfa içi window.model JSON'ı kullan
                     detay = N11SayfaParse(pageSource) ?? new UrunDetay();
-                    _logger.LogInformation(
-                        "[n11-SayfaParse] Ad=\"{Ad}\" | Fiyat=\"{Fiyat}\" | Satici=\"{Satici}\" | Resim=\"{Resim}\"",
-                        detay.Ad, detay.Fiyat, detay.Satici,
-                        string.IsNullOrEmpty(detay.ResimUrl) ? "(yok)" : "var");
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation(
+                            "[n11-SayfaParse] Ad=\"{Ad}\" | Fiyat=\"{Fiyat}\" | Satici=\"{Satici}\" | Resim=\"{Resim}\"",
+                            detay.Ad, detay.Fiyat, detay.Satici,
+                            string.IsNullOrEmpty(detay.ResimUrl) ? "(yok)" : "var");
+                    }
                 }
                 else
                 {
                     detay = JsonLdParse(pageSource, hedefSatici) ?? new UrunDetay();
-                    _logger.LogInformation(
-                        "[JsonLd] hedefSatici=\"{Hedef}\" | offers=[{Teklifler}] | secilen=\"{Satici}\"/{Fiyat}",
-                        hedefSatici ?? "(yok)",
-                        _sonJsonLdTeshis ?? "(boş)",
-                        detay.Satici,
-                        detay.Fiyat);
+                    if (_logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation(
+                            "[JsonLd] hedefSatici=\"{Hedef}\" | offers=[{Teklifler}] | secilen=\"{Satici}\"/{Fiyat}",
+                            hedefSatici ?? "(yok)",
+                            _sonJsonLdTeshis ?? "(boş)",
+                            detay.Satici,
+                            detay.Fiyat);
+                    }
                 }
                 detay.Url = url;
 
@@ -976,7 +991,10 @@ public class ScraperService
                 if (adYok || fiyatYok)
                     TeshisLogla(url, driver, pageSource);
 
-                _logger.LogInformation("[ScraperService] Detay: {Ad} | {Fiyat}", detay.Ad, detay.Fiyat);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation("[ScraperService] Detay: {Ad} | {Fiyat}", detay.Ad, detay.Fiyat);
+                }
                 return detay;
             }
             finally { _slot.Release(); }
@@ -996,10 +1014,10 @@ public class ScraperService
                 driver.Navigate().GoToUrl(kategoriUrl);
 
                 // Akıllı bekleme: ürün kartları gelene kadar (max 15 sn)
-                await SelectorBekleAsync(driver, new[] {
+                await SelectorBekleAsync(driver, [
                     By.CssSelector("li[class*='productListContent-']"),
                     By.CssSelector("div[data-test-id*='product-card']")
-                }, 15);
+                ], 15);
 
                 string source;
                 try { source = driver.PageSource; }
@@ -1039,7 +1057,7 @@ public class ScraperService
             }
             finally { _slot.Release(); }
         }));
-}
+
 
 public class UrunKart
 {
@@ -1057,4 +1075,44 @@ public class UrunDetay
     public decimal FiyatSayi { get; set; }
     public string ResimUrl { get; set; } = "";
     public string Satici { get; set; } = "Bilinmiyor";
+}
+
+    [GeneratedRegex(@"-p[a-z]*-[A-Za-z0-9]", RegexOptions.IgnoreCase)]
+    private static partial Regex HbUrunRegex();
+
+    [GeneratedRegex(@"-[a-z]+\d+/?$", RegexOptions.IgnoreCase)]
+    private static partial Regex CiceksepetiUrunRegex();
+
+    [GeneratedRegex(@"-p-\d+/?$", RegexOptions.IgnoreCase)]
+    private static partial Regex TeknosaUrunRegex();
+
+    [GeneratedRegex(@"^/urun/.+-\d+/?$", RegexOptions.IgnoreCase)]
+    private static partial Regex N11UrunRegex();
+
+    [GeneratedRegex(@"-p-\d+/?$", RegexOptions.IgnoreCase)]
+    private static partial Regex PttavmUrunRegex();
+
+    [GeneratedRegex(@"""title"":""([^""\\]*(?:\\.[^""\\]*)*)""")]
+    private static partial Regex N11TitleRegex();
+
+    [GeneratedRegex(@"\s*Fiyatları ve Özellikleri\s*$", RegexOptions.IgnoreCase)]
+    private static partial Regex N11TitleSuffixRegex();
+
+    [GeneratedRegex(@"""price"":""(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?\s*TL)""")]
+    private static partial Regex N11PriceRegex();
+
+    [GeneratedRegex(@"""priceFloat"":(\d+(?:\.\d+)?)")]
+    private static partial Regex N11PriceFloatRegex();
+
+    [GeneratedRegex(@"""images"":\[\s*\{\s*[^}]*?""path"":""(https://n11scdn[^""]+?IMG-[^""]+?)""")]
+    private static partial Regex N11ImageRegex();
+
+    [GeneratedRegex(@"""nickName""\s*:\s*""([^""]+)""")]
+    private static partial Regex N11SellerRegex();
+
+    [GeneratedRegex(@"(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)(?:\s*(?:TL|₺|TRY))?", RegexOptions.IgnoreCase)]
+    private static partial Regex FiyatParseRegex();
+
+    [GeneratedRegex(@"Sepete\s*özel\s*fiyat[\s\S]{0,300}?(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*TL", RegexOptions.IgnoreCase)]
+    private static partial Regex SepeteOzelFiyatRegex();
 }
