@@ -9,8 +9,16 @@ namespace FiyatTakipWebSitesi.Services;
 
 public partial class ScraperService(ILogger<ScraperService> logger)
 {
+<<<<<<< HEAD
     private readonly ILogger<ScraperService> _logger = logger;
     private static readonly SemaphoreSlim _slot = new(2, 2);
+=======
+    private readonly ILogger<ScraperService> _logger;
+    // Aynı anda en fazla kaç Chrome instance açık olabilir. FiyatGuncellemeJob'daki
+    // MaxParalelScrape ile uyumlu olmalı — orası 3 iken burası 2 olursa
+    // job'da darboğaz oluşur.
+    private static readonly SemaphoreSlim _slot = new(3, 3);
+>>>>>>> f6495d9b0ab8745a9691ed149ed543146a578ca9
     private static readonly System.Globalization.CultureInfo _tr = new("tr-TR");
     private static readonly System.Globalization.CultureInfo _inv = System.Globalization.CultureInfo.InvariantCulture;
 
@@ -117,6 +125,36 @@ public partial class ScraperService(ILogger<ScraperService> logger)
     // Multi-seller (?magaza= parametresi olan) siteler — buy-box mantığı
     private static bool MultiSellerSite(Site site) =>
         site == Site.Hepsiburada || site == Site.N11;
+
+    // ─────────────────────────────────────────────────────────
+    // PttAVM ana satıcısı gerçekten "satıyor mu?" kontrolü.
+    // PttAVM marketplace: ana satıcı stoksuz/pasif olsa bile JSON-LD'de
+    // hâlâ fiyat olabiliyor (Satıcıya Sor durumu). Bizim scraper bu fiyatı
+    // en düşük zannedip çekiyor — kullanıcı sayfaya tıkladığında fiyatı
+    // ana satıcı bölümünde GÖRMÜYOR (yanıltıcı UX).
+    //
+    // Tespit: Ana satıcının "Sepete Ekle" butonu yoksa (yerine "Satıcıya Sor"
+    // veya "Benzer Ürünleri Gör" varsa) → ana satıcı pasif → URL skip.
+    //
+    // Bu durumda fiyat boş döner, OtomatikGuncelleAsync otomatik pasifleştirir
+    // (mevcut stok-tükendi mantığı devreye girer).
+    // ─────────────────────────────────────────────────────────
+    private static bool PttavmAnaSaticiAktif(string pageSource)
+    {
+        if (string.IsNullOrEmpty(pageSource)) return true; // Bilinmiyor → kabullen
+
+        // "Satıcıya Sor" veya "Benzer Ürünleri Gör" varsa ana satıcı satışa kapalı.
+        // Türkçe label sabit — class isimleri değişse de bu metinler kalır.
+        // Tek bir alfabe varyantı kontrolü yeter; "Sepete Ekle"nin yokluğu da
+        // ölçüt olabilirdi ama positive-match (kötü-durum yakala) daha güvenli:
+        // bazı pasif sayfalar JS'le ekleyebilir, server-rendered HTML'de yok.
+        if (pageSource.Contains("Satıcıya Sor", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (pageSource.Contains("Benzer Ürünleri Gör", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return true;
+    }
 
     // ─────────────────────────────────────────────────────────
     // URL'in geçerli bir ürün linki olup olmadığını kontrol et
@@ -710,6 +748,17 @@ public partial class ScraperService(ILogger<ScraperService> logger)
 
                 var pageSource = driver.PageSource;
 
+                // PttAVM kontrolü: ana satıcı pasifse skip et (kullanıcı sayfaya
+                // gittiğinde fiyatı GÖREMİYOR, en düşük teklif çekmek yanıltıcı).
+                // Detay: PttavmAnaSaticiAktif yorumuna bak.
+                if (site == Site.Pttavm && !PttavmAnaSaticiAktif(pageSource))
+                {
+                    _logger.LogInformation(
+                        "[PttAVM] Ana satıcı pasif (Satıcıya Sor / Benzer Ürünleri Gör) → fiyat alma | {Url}",
+                        url);
+                    return "Fiyat bulunamadı";
+                }
+
                 // Multi-seller sitelerde URL'deki ?magaza= parametresi hedef satıcı belirler
                 // BuyBoxSatici sadece Hepsiburada selector'larını kullandığı için ona özel
                 string? hedefSatici = null;
@@ -821,6 +870,18 @@ public partial class ScraperService(ILogger<ScraperService> logger)
                 await SelectorBekleAsync(driver, beklemeSelectors, 15);
 
                 var pageSource = driver.PageSource;
+
+                // PttAVM kontrolü: ana satıcı pasifse skip et (kullanıcı sayfaya
+                // gittiğinde fiyatı GÖREMİYOR, en düşük teklif çekmek yanıltıcı).
+                // Boş UrunDetay dönüyoruz — OtomatikGuncelleAsync stok-tükendi
+                // mantığı bunu pasifleştirir.
+                if (site == Site.Pttavm && !PttavmAnaSaticiAktif(pageSource))
+                {
+                    _logger.LogInformation(
+                        "[PttAVM] Ana satıcı pasif (Satıcıya Sor / Benzer Ürünleri Gör) → fiyat alma | {Url}",
+                        url);
+                    return new UrunDetay { Url = url };
+                }
 
                 // Hedef satıcı (sadece Hepsiburada'da anlamlı — multi-seller buy box)
                 // Multi-seller sitelerde URL'deki ?magaza= parametresi hedef satıcı belirler

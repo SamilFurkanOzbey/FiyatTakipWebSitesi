@@ -222,7 +222,9 @@ else
 
     private async Task UrunleriYukle()
     {
-        var dbUrunler = await UrunServisi.GetAllAsync();
+        // SADECE kullanıcının elle eklediği ürünleri çek — sistem kataloğu hariç
+        // (GetAllAsync hem katalog hem kullanıcı ürünlerini dönerdi; bu sayfa için yanlış)
+        var dbUrunler = await UrunServisi.GetKullaniciTakipleriAsync();
         urunler = dbUrunler.Select(u => new TakipUrun
         {
             Id = u.Id,

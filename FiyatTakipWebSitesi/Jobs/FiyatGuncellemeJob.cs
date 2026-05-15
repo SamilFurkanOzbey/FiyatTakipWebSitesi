@@ -1,14 +1,18 @@
 // =====================================================
 // FiyatGuncellemeJob.cs
-// Bu sınıf, Hangfire tarafından periyodik olarak (saatlik
-// veya günlük) tetiklenen arka plan işini tanımlar.
-// Tüm aktif ürünlerin fiyatlarını ScraperService üzerinden
-// çekerek UrunService aracılığıyla veritabanına kaydeder.
-// Tek bir ürünün scraping hatası tüm işi durdurmaz;
-// hatalar loglanıp diğer ürünlere devam edilir.
+// Bu sınıf, Hangfire tarafından periyodik olarak (06:00 ve 18:00)
+// tetiklenen arka plan işini tanımlar.
+// Aktif ürünlerin fiyatlarını ScraperService üzerinden PARALEL olarak
+// (concurrency = MaxParalelScrape) çekerek UrunService aracılığıyla
+// veritabanına kaydeder.
+// İki giriş noktası:
+//   • TumUrunlerGuncelleAsync()           → tüm aktif ürünler (otomatik schedule)
+//   • KategoriUrunlerGuncelleAsync(id)    → sadece bir kategoride (manuel test)
+// Tek bir ürünün scraping hatası tüm işi durdurmaz.
 // =====================================================
 
 using FiyatTakipWebSitesi.Data;
+using FiyatTakipWebSitesi.Models;
 using FiyatTakipWebSitesi.Services;
 using Microsoft.EntityFrameworkCore;
 using Polly;
@@ -23,102 +27,130 @@ public class FiyatGuncellemeJob(
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ILogger<FiyatGuncellemeJob> _logger = logger;
 
+    // Aynı anda kaç ürün paralel scrape edilsin. ScraperService içindeki
+    // SemaphoreSlim ile uyumlu olmalı.
+    private const int MaxParalelScrape = 3;
+
     /// <summary>
-    /// Tüm aktif ürünlerin fiyatlarını güncellemek için her bir ürün adına 
-    /// ayrı bir Hangfire job'ı kuyruğa (enqueue) ekler.
+    /// Tüm aktif ürünlerin fiyatlarını paralel olarak günceller.
+    /// Hangfire 06:00 ve 18:00 schedule'larıyla otomatik tetiklenir.
     /// </summary>
     public async Task TumUrunlerGuncelleAsync()
     {
-        if (_logger.IsEnabled(LogLevel.Information))
+        List<Urun> urunler;
+        await using (var listeScope = _scopeFactory.CreateAsyncScope())
         {
-            _logger.LogInformation("[FiyatGuncellemeJob] Periyodik fiyat güncelleme tetiklendi — {Zaman}", DateTime.Now);
+            var db = listeScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            urunler = await db.Urunler
+                .Where(u => u.Aktif && !string.IsNullOrEmpty(u.URL))
+                .ToListAsync();
         }
 
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // Aktif, URL'si olan tüm ürünlerin sadece ID'lerini çek
-        var urunIdListesi = await db.Urunler
-            .Where(u => u.Aktif && !string.IsNullOrEmpty(u.URL))
-            .Select(u => u.Id)
-            .ToListAsync();
-
-        if (_logger.IsEnabled(LogLevel.Information))
-        {
-            _logger.LogInformation("[FiyatGuncellemeJob] {Adet} aktif ürün için tekil güncelleme görevleri kuyruğa ekleniyor.", urunIdListesi.Count);
-        }
-
-        foreach (var id in urunIdListesi)
-        {
-            BackgroundJob.Enqueue<FiyatGuncellemeJob>(job => job.TekUrunGuncelleAsync(id));
-        }
+        await UrunleriGuncelleAsync(urunler, etiket: "TÜM");
     }
 
     /// <summary>
-    /// Tek bir ürünün fiyatını ScraperService üzerinden çeker ve veritabanını günceller.
-    /// Hangfire tarafından arka planda asenkron çalıştırılır.
+    /// Sadece belirli bir kategorideki aktif ürünleri günceller.
+    /// Hangfire dashboard'unda "Trigger now" ile manuel tetiklenir
+    /// (otomatik schedule yok — Program.cs'te Cron.Yearly ile kayıtlı).
     /// </summary>
-    public async Task TekUrunGuncelleAsync(int urunId)
+    public async Task KategoriUrunlerGuncelleAsync(int kategoriId)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var urunService = scope.ServiceProvider.GetRequiredService<UrunService>();
-        var scraperService = scope.ServiceProvider.GetRequiredService<ScraperService>();
-
-        var urun = await db.Urunler.FirstOrDefaultAsync(u => u.Id == urunId);
-        
-        if (urun == null || !urun.Aktif || string.IsNullOrEmpty(urun.URL))
+        List<Urun> urunler;
+        string kategoriAdi = $"#{kategoriId}";
+        await using (var listeScope = _scopeFactory.CreateAsyncScope())
         {
-            _logger.LogWarning("[FiyatGuncellemeJob] Ürün #{Id} bulunamadı, inaktif veya URL'si boş. Görev iptal ediliyor.", urunId);
-            return;
+            var db = listeScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            urunler = await db.Urunler
+                .Where(u => u.Aktif && u.KategoriId == kategoriId && !string.IsNullOrEmpty(u.URL))
+                .ToListAsync();
+
+            kategoriAdi = await db.Kategoriler
+                .Where(k => k.Id == kategoriId)
+                .Select(k => k.Ad)
+                .FirstOrDefaultAsync() ?? kategoriAdi;
         }
 
-        try
-        {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("[FiyatGuncellemeJob] Scraping başladı — ürün #{Id}: {Ad}", urun.Id, urun.Ad);
-            }
+        await UrunleriGuncelleAsync(urunler, etiket: kategoriAdi);
+    }
 
-            var retryPolicy = Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                (exception, timeSpan, retryCount, context) =>
+    /// <summary>
+    /// Verilen ürün listesini paralel olarak scrape eder ve günceller.
+    /// Her iş parçacığı için ayrı DI scope açılır (DbContext thread-safe değil).
+    /// </summary>
+    private async Task UrunleriGuncelleAsync(List<Urun> urunler, string etiket)
+    {
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[FiyatGuncellemeJob] [{Etiket}] Başladı — {Adet} ürün, paralel: {Paralel}",
+                etiket, urunler.Count, MaxParalelScrape);
+        }
+
+        if (urunler.Count == 0) return;
+
+        // Thread-safe sayaçlar
+        int basarili = 0, hatali = 0;
+
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = MaxParalelScrape,
+        };
+
+        await Parallel.ForEachAsync(urunler, parallelOptions, async (urun, ct) =>
+        {
+            // HER ITERATION KENDİ DI SCOPE'UNU AÇAR (DbContext thread-safe değil)
+            await using var iterScope = _scopeFactory.CreateAsyncScope();
+            var urunService = iterScope.ServiceProvider.GetRequiredService<UrunService>();
+            var scraperService = iterScope.ServiceProvider.GetRequiredService<ScraperService>();
+
+            try
+            {
+                var retryPolicy = Policy
+                    .Handle<Exception>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.LogWarning(
+                            "[FiyatGuncellemeJob] Scraping hatası, tekrar deneniyor ({RetryCount}/3) — ürün #{Id}. Hata: {Mesaj}",
+                            retryCount, urun.Id, exception.Message);
+                    });
+
+                var detay = await retryPolicy.ExecuteAsync(async () => await scraperService.GetUrunDetayAsync(urun.URL));
+
+                if (detay.FiyatSayi <= 0)
                 {
                     _logger.LogWarning(
-                        "[FiyatGuncellemeJob] Scraping hatası, tekrar deneniyor ({RetryCount}/3) — ürün #{Id}. Hata: {Mesaj}",
-                        retryCount, urun.Id, exception.Message);
-                });
+                        "[FiyatGuncellemeJob] Fiyat alınamadı veya sıfır — ürün #{Id}: '{Ham}'",
+                        urun.Id, detay.Fiyat);
+                    Interlocked.Increment(ref hatali);
+                    return;
+                }
 
-            var detay = await retryPolicy.ExecuteAsync(async () => await scraperService.GetUrunDetayAsync(urun.URL));
+                await urunService.OtomatikGuncelleAsync(urun.Id, detay);
 
-            if (detay.FiyatSayi <= 0)
-            {
-                _logger.LogWarning(
-                    "[FiyatGuncellemeJob] Fiyat alınamadı veya sıfır — ürün #{Id}: '{Ham}'",
-                    urun.Id, detay.Fiyat);
-                return;
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation(
+                        "[FiyatGuncellemeJob] ✓ Ürün #{Id} güncellendi — Yeni fiyat: {Fiyat:N2} TL",
+                        urun.Id, detay.FiyatSayi);
+                }
+                Interlocked.Increment(ref basarili);
             }
-            
-            decimal yeniFiyat = detay.FiyatSayi;
-
-            await urunService.FiyatGuncelleAsync(urun.Id, yeniFiyat, stokVar: true);
-
-            if (_logger.IsEnabled(LogLevel.Information))
+            catch (Exception ex)
             {
-                _logger.LogInformation(
-                    "[FiyatGuncellemeJob] ✓ Ürün #{Id} güncellendi — Yeni fiyat: {Fiyat:N2} TL",
-                    urun.Id, yeniFiyat);
+                _logger.LogError(ex,
+                    "[FiyatGuncellemeJob] ✗ Ürün #{Id} güncellenirken hata: {Mesaj}",
+                    urun.Id, ex.Message);
+                Interlocked.Increment(ref hatali);
             }
-        }
-        catch (Exception ex)
+        });
+
+        if (_logger.IsEnabled(LogLevel.Information))
         {
-            _logger.LogError(ex,
-                "[FiyatGuncellemeJob] ✗ Ürün #{Id} güncellenirken kritik hata: {Mesaj}",
-                urun.Id, ex.Message);
-            
-            // Hangfire'ın job'ı retry yapabilmesi için hatayı fırlatıyoruz
-            throw;
+            _logger.LogInformation(
+                "[FiyatGuncellemeJob] [{Etiket}] Tamamlandı — Başarılı: {Basarili}, Hatalı: {Hatali}, Toplam: {Toplam}",
+                etiket, basarili, hatali, urunler.Count);
         }
     }
 }
