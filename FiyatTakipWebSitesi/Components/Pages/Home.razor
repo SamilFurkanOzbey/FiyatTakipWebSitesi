@@ -1,6 +1,8 @@
 ﻿@page "/"
 @rendermode InteractiveServer
-<PageTitle>Ana Sayfa</PageTitle>
+@inject NavigationManager NavManager
+
+<PageTitle>Ana Sayfa | Fiyat Takip</PageTitle>
 
 <div class="home-container">
 
@@ -10,10 +12,14 @@
     </div>
 
     <NavLink href="/kategoriler" class="tum-kategori-btn">
-        Tüm Kategoriler Sayfasına Git
+        Tüm Kategoriler
     </NavLink>
 
     <div class="kategori-row">
+        <button class="kategori-btn seed-btn" @onclick="OrnekVeriYukle" title="Veritabanı boşsa örnek veri doldurur">
+            📦 Örnek Veri Yükle (Seed)
+        </button>
+
         @foreach (var kategori in kategoriler)
         {
             <button class="kategori-btn @(secilenKategori == kategori ? "active" : "")"
@@ -29,13 +35,18 @@
             @foreach (var urun in gosterilenUrunler)
             {
                 <div class="urun-card">
+                    <button class="takip-btn" title="Takibe Al" @onclick="() => TakibeEkle(urun)">
+                        <i class="bi bi-plus-lg">+</i>
+                        <span class="tooltip-text">Takibe Al</span>
+                    </button>
+
                     <img src="@urun.Resim" alt="@urun.Ad" />
                     <h4>@urun.Ad</h4>
                     <p class="fiyat">@urun.Fiyat</p>
 
                     <div class="btn-row">
-                        <NavLink href="/UrunDetaySayfasi" class="detay-btn">Detay</NavLink>
-                        <NavLink href="/Analiz" class="grafik-btn">Grafik</NavLink>
+                        <NavLink href="/urundetay" class="detay-btn">Detay</NavLink>
+                        <NavLink href="/grafik" class="grafik-btn">Grafik</NavLink>
                     </div>
                 </div>
             }
@@ -44,7 +55,7 @@
     else if (!string.IsNullOrEmpty(secilenKategori))
     {
         <div class="bos-uyari">
-            <p>Bu kategoriye ait örnek ürünler henüz eklenmedi. (Şimdilik sadece Elektronik ve Moda dolu)</p>
+            <p>Bu kategori için örnek veriler hazırlanıyor...</p>
         </div>
     }
 
@@ -57,48 +68,55 @@
     .hero p { color: #94a3b8; margin-bottom: 20px; }
     
     .tum-kategori-btn { 
-        display: inline-block; 
-        background: #1e293b; 
-        color: #38bdf8; 
-        text-decoration: none; 
-        padding: 10px 20px; 
-        border: 1px solid #38bdf8;
-        border-radius: 10px; 
-        margin-bottom: 30px;
-        transition: 0.3s;
+        display: inline-block; background: #334155; color: white; 
+        text-decoration: none; padding: 10px 20px; border-radius: 10px; 
+        margin-bottom: 30px; font-size: 14px; transition: 0.3s;
     }
-    .tum-kategori-btn:hover { background: #38bdf8; color: #0f172a; }
+    .tum-kategori-btn:hover { background: #475569; }
 
     .kategori-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 30px; }
     
     .kategori-btn { 
-        background: #1e293b; 
-        color: white; 
-        border: 2px solid #334155; 
-        padding: 15px 25px; 
-        border-radius: 14px; 
-        cursor: pointer; 
-        font-size: 16px;
-        font-weight: 500;
+        background: #1e293b; color: white; border: 2px solid #334155; 
+        padding: 12px 22px; border-radius: 14px; cursor: pointer; 
+        font-size: 16px; transition: 0.3s;
+    }
+    .kategori-btn.active { background: #0284c7; border-color: #38bdf8; }
+
+    /* Seed butonu özel stili */
+    .seed-btn { background: #059669; border-color: #047857; color: #fff; font-weight:bold; }
+    .seed-btn:hover { background: #10b981; }
+
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+
+    .urun-card { 
+        background: #1e293b; padding: 15px; border-radius: 18px; 
+        border: 1px solid #334155; position: relative; transition: 0.3s;
+    }
+
+    .takip-btn {
+        position: absolute; top: 15px; right: 15px; width: 35px; height: 35px;
+        border-radius: 50%; background: #38bdf8; color: #0f172a; border: none;
+        font-weight: bold; font-size: 20px; cursor: pointer; z-index: 10;
+        display: flex; align-items: center; justify-content: center;
         transition: 0.3s;
     }
-    .kategori-btn:hover { border-color: #38bdf8; }
-    .kategori-btn.active { background: #0284c7; border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
+    .takip-btn:hover { transform: scale(1.1); background: #0ea5e9; }
 
-    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; animation: fadeIn 0.5s; }
-    
-    @@keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .tooltip-text {
+        visibility: hidden; width: 80px; background-color: #334155;
+        color: #fff; text-align: center; border-radius: 6px;
+        padding: 5px; position: absolute; z-index: 11;
+        bottom: 125%; left: 50%; margin-left: -40px; opacity: 0;
+        transition: opacity 0.3s; font-size: 12px;
     }
+    .takip-btn:hover .tooltip-text { visibility: visible; opacity: 1; }
 
-    .urun-card { background: #1e293b; padding: 15px; border-radius: 18px; border: 1px solid #334155; }
     .urun-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; }
-    .fiyat { color: #38bdf8; font-weight: bold; font-size: 1.2rem; }
+    .fiyat { color: #38bdf8; font-weight: bold; font-size: 1.2rem; margin: 10px 0; }
     .btn-row { display: flex; gap: 10px; margin-top: 15px; }
     .detay-btn { background: #475569; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
     .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
-    .bos-uyari { padding: 30px; text-align: center; background: #1e293b; border-radius: 15px; color: #94a3b8; }
 </style>
 
 @code {
@@ -110,45 +128,50 @@
     protected override void OnInitialized()
     {
         UrunleriYukle();
+        KategoriSec("Elektronik");
+    }
+
+    async Task OrnekVeriYukle()
+    {
+        UrunleriYukle();
+        KategoriSec("Elektronik");
     }
 
     void UrunleriYukle()
     {
+        tumUrunler.Clear();
         string[] elektronikler = { "iPhone 15", "MacBook Air", "Sony WH-1000XM5", "Logitech G502", "Razer BlackWidow", "Samsung Odyssey G7", "iPad Pro", "Apple Watch S9", "Samsung T7 SSD", "Logitech C920", "JBL Flip 6", "Meta Quest 3" };
         string[] modalar = { "Siyah Trençkot", "Oversize Hoodie", "Air Jordan 1", "Basic Beyaz Tişört", "Slim Fit Gömlek", "Chelsea Bot", "Ray-Ban Wayfarer", "North Face Çanta", "V Yaka Kazak", "Chino Pantolon", "Gece Elbisesi", "Kolombiya Mont" };
 
         for (int i = 0; i < 12; i++)
         {
-            // Elektronik Ekle
-            tumUrunler.Add(new Urun {
-                Ad = elektronikler[i],
-                Fiyat = $"{new Random().Next(3000, 60000)} TL",
-                Kategori = "Elektronik",
-                Resim = $"https://picsum.photos/400/300?random=e{i}"
-            });
-
-            // Moda Ekle
-            tumUrunler.Add(new Urun {
-                Ad = modalar[i],
-                Fiyat = $"{new Random().Next(500, 8000)} TL",
-                Kategori = "Moda",
-                Resim = $"https://picsum.photos/400/600?random=m{i}"
-            });
+            tumUrunler.Add(new Urun { Ad = elektronikler[i], Fiyat = $"{15000 + (i * 500)} TL", Kategori = "Elektronik", Resim = $"https://picsum.photos/400/300?random=e{i}" });
+            tumUrunler.Add(new Urun { Ad = modalar[i], Fiyat = $"{1200 + (i * 100)} TL", Kategori = "Moda", Resim = $"https://picsum.photos/400/600?random=m{i}" });
         }
+    }
+
+    void KategoriSec(string kategori)
+    {
+        secilenKategori = kategori;
+        gosterilenUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
     }
 
     void KategoriToggle(string kategori)
     {
         if (secilenKategori == kategori)
         {
-            secilenKategori = ""; // Aynı kategoriye basılırsa kapat
+            secilenKategori = "";
             gosterilenUrunler.Clear();
         }
         else
         {
-            secilenKategori = kategori;
-            gosterilenUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
+            KategoriSec(kategori);
         }
+    }
+
+    void TakibeEkle(Urun urun)
+    {
+        NavManager.NavigateTo("/takip");
     }
 
     class Urun {

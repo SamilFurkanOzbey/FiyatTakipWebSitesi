@@ -1,164 +1,175 @@
 ﻿@page "/takip"
 @rendermode InteractiveServer
-@inject IJSRuntime JS
+@inject HttpClient Http
 
 <h2>⭐ Takip Ettiklerim</h2>
 
 <div style="margin-bottom:20px;">
-
-    <!-- LINK INPUT -->
     <input @bind="yeniLink"
            placeholder="Ürün linki yapıştır..."
-           style="width:300px; padding:6px;" />
+           style="width:300px; padding:6px; border-radius:6px; border:1px solid #ccc; color: black;" />
 
-    <!-- KATEGORİ -->
-    <select @bind="secilenKategori" style="margin-left:10px; padding:6px;">
-        @foreach (var kategori in kategoriler)
-        {
-            <option value="@kategori">@kategori</option>
-        }
+    <select @bind="secilenKategoriId" style="margin-left:10px; padding:6px; border-radius:6px; color: black;">
+        <option value="1">Telefon</option>
+        <option value="2">Bilgisayar</option>
+        <option value="3">Elektronik</option>
+        <option value="4">Giyim</option>
+        <option value="5">Diğer</option>
     </select>
 
-    <!-- BUTON -->
     <button class="btn btn-primary"
             style="margin-left:10px;"
             @onclick="UrunEkle">
         Ekle
     </button>
-
 </div>
 
-<p style="color:green">@mesaj</p>
-
+<p style="color: @(mesaj.Contains("hata") || mesaj.Contains("gir") ? "red" : "green"); font-weight:bold;">@mesaj</p>
 <hr />
 
 <h4>📦 Takip Listesi</h4>
 
 <div style="display:flex; gap:20px; flex-wrap:wrap;">
 
-    @foreach (var urun in urunler)
+    @if (urunler == null)
     {
-        <div class="card" style="width: 18rem;">
-            <div class="card-body">
+        <p>Ürünler yükleniyor...</p>
+    }
+    else if (!urunler.Any())
+    {
+        <p>Takip edilen ürün bulunamadı.</p>
+    }
+    else
+    {
+        @foreach (var urun in urunler)
+        {
+            <div class="card bg-dark text-white" style="width: 18rem; border-color: #334155;">
+                
+                @if (!string.IsNullOrEmpty(urun.ResimUrl))
+                {
+                    <img src="@urun.ResimUrl" class="card-img-top" alt="@urun.Ad" style="height: 200px; object-fit: contain; background: white;" />
+                }
 
-                <h5 class="card-title">@urun.Ad</h5>
-                <p class="card-text">@urun.Fiyat</p>
+                <div class="card-body">
+                    <h5 class="card-title" style="font-size:1.1rem; height:50px; overflow:hidden;">@urun.Ad</h5>
+                    <p class="card-text text-info fw-bold fs-5">@urun.Fiyat</p>
+                    
+                    @if (!string.IsNullOrEmpty(urun.Satici))
+                    {
+                        <p class="text-secondary small" style="margin-bottom:5px;">🏪 @urun.Satici</p>
+                    }
 
-                <span class="badge bg-secondary">@urun.Kategori</span>
+                    <span class="badge bg-secondary mb-3">Kategori ID: @urun.KategoriId</span>
+                    <br />
 
-                <br /><br />
-
-                <button class="btn btn-sm btn-danger"
-                        @onclick="() => Sil(urun)">
-                    Sil
-                </button>
-
+                    <button class="btn btn-sm btn-danger w-100"
+                            @onclick="() => Sil(urun.Id)">
+                        Sil
+                    </button>
+                </div>
             </div>
-        </div>
+        }
     }
 
 </div>
 
 @code {
-
-    // KATEGORİLER
-    List<string> kategoriler = new()
-    {
-        "Telefon",
-        "Bilgisayar",
-        "Elektronik",
-        "Giyim",
-        "Diğer"
-    };
-
-    string secilenKategori = "Telefon";
-
-    // MODEL
-    public class Urun
-    {
-        public string Ad { get; set; }
-        public string Fiyat { get; set; }
-        public string Kategori { get; set; }
-    }
-
-    // LİSTE
-    List<Urun> urunler = new();
-
+    List<UrunResponse> urunler = new();
     string yeniLink = "";
     string mesaj = "";
+    
+    int secilenKategoriId = 1;
+    int girisYapanKullaniciId = 1;
 
-    // SAYFA AÇILINCA ÇALIŞIR
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
-        {
-            var data = await JS.InvokeAsync<string>("localStorage.getItem", "takipUrunler");
+        await ListeyiGetir();
+    }
 
-            if (!string.IsNullOrEmpty(data))
+    async Task ListeyiGetir()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<UrunResponse>>($"/api/urunler?kullaniciId={girisYapanKullaniciId}");
+            if (response != null)
             {
-                urunler = System.Text.Json.JsonSerializer.Deserialize<List<Urun>>(data);
-                StateHasChanged();
+                urunler = response;
             }
+        }
+        catch
+        {
+            mesaj = "Bağlantı bekleniyor... Backend API'den veri alınamadı.";
         }
     }
 
-    // ÜRÜN EKLE
     async Task UrunEkle()
     {
         if (string.IsNullOrWhiteSpace(yeniLink))
         {
-            mesaj = "Link gir!";
+            mesaj = "Lütfen bir link gir!";
             return;
         }
 
-        var yeniUrun = new Urun
+        mesaj = "Scraper çalışıyor, ürün ekleniyor lütfen bekleyin...";
+
+        var request = new UrunEkleRequest
         {
-            Ad = ParseUrunAdi(yeniLink),
-            Fiyat = "Henüz çekilmedi",
-            Kategori = secilenKategori
+            URL = yeniLink,
+            KategoriId = secilenKategoriId,
+            UserId = girisYapanKullaniciId
         };
 
-        urunler.Add(yeniUrun);
-
-        // KAYDET
-        await JS.InvokeVoidAsync("localStorage.setItem",
-            "takipUrunler",
-            System.Text.Json.JsonSerializer.Serialize(urunler));
-
-        yeniLink = "";
-        mesaj = "Ürün eklendi!";
-    }
-
-    // ÜRÜN SİL
-    async Task Sil(Urun urun)
-    {
-        urunler.Remove(urun);
-
-        await JS.InvokeVoidAsync("localStorage.setItem",
-            "takipUrunler",
-            System.Text.Json.JsonSerializer.Serialize(urunler));
-    }
-
-    // LINKTEN İSİM ÇIKAR
-    string ParseUrunAdi(string url)
-    {
         try
         {
-            var uri = new Uri(url);
-            string path = uri.AbsolutePath;
-
-            string name = path.Replace("/", "")
-                              .Replace("-", " ")
-                              .Replace("_", " ");
-
-            if (string.IsNullOrWhiteSpace(name))
-                return "Ürün";
-
-            return char.ToUpper(name[0]) + name.Substring(1);
+            var res = await Http.PostAsJsonAsync("/api/urunler", request);
+            
+            if (res.IsSuccessStatusCode)
+            {
+                yeniLink = "";
+                mesaj = "Ürün başarıyla takip listesine eklendi!";
+                await ListeyiGetir();
+            }
+            else
+            {
+                mesaj = "Eklenirken bir hata oluştu. Link desteklenen sitelerden mi?";
+            }
         }
         catch
         {
-            return "Geçersiz link";
+            mesaj = "API'ye ulaşılamadı. Backend çalışıyor mu?";
         }
+    }
+
+    async Task Sil(int id)
+    {
+        try
+        {
+            var res = await Http.DeleteAsync($"/api/urunler/{id}");
+            if (res.IsSuccessStatusCode)
+            {
+                await ListeyiGetir();
+            }
+        }
+        catch
+        {
+            mesaj = "Ürün silinemedi.";
+        }
+    }
+
+    public class UrunResponse
+    {
+        public int Id { get; set; }
+        public string Ad { get; set; } = "";
+        public string Fiyat { get; set; } = "";
+        public string ResimUrl { get; set; } = "";
+        public string Satici { get; set; } = "";
+        public int KategoriId { get; set; }
+    }
+
+    public class UrunEkleRequest
+    {
+        public string URL { get; set; } = "";
+        public int KategoriId { get; set; }
+        public int UserId { get; set; }
     }
 }
