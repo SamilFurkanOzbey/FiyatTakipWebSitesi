@@ -35,13 +35,15 @@ public class UrunService(
 
     // --- Okuma ---
 
-    public async Task<List<Urun>> GetAllAsync()
+    public async Task<List<Urun>> GetAllAsync(int skip = 0, int take = 50)
         => await _context.Urunler
             .AsNoTracking()
             .Include(u => u.Kategori)
             .Include(u => u.Kullanici)
             .Where(u => u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync();
 
     public async Task<Urun?> GetByIdAsync(int id)
@@ -52,12 +54,14 @@ public class UrunService(
             .Include(u => u.Uyarilar)
             .FirstOrDefaultAsync(u => u.Id == id);
 
-    public async Task<List<Urun>> GetByKategoriAsync(int kategoriId)
+    public async Task<List<Urun>> GetByKategoriAsync(int kategoriId, int skip = 0, int take = 50)
         => await _context.Urunler
             .AsNoTracking()
             .Include(u => u.Kategori)
             .Where(u => u.KategoriId == kategoriId && u.Aktif)
             .OrderByDescending(u => u.EklendigiTarih)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync();
 
     public async Task<List<Urun>> GetByKullaniciAsync(int kullaniciId)
@@ -618,9 +622,12 @@ public class UrunService(
                 pasiflestirilen);
         }
 
-        _logger.LogInformation(
-            "[Seed] Katalog seed tamamlandı — Eklenen: {EkM} model, {EkL} listeleme | Atlanan: {AtM} model, {AtL} listeleme | Pasifleştirilen: {Pasif}",
-            eklenenModel, eklenenListe, atlananModel, atlananListe, pasiflestirilen);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[Seed] Katalog seed tamamlandı — Eklenen: {EkM} model, {EkL} listeleme | Atlanan: {AtM} model, {AtL} listeleme | Pasifleştirilen: {Pasif}",
+                eklenenModel, eklenenListe, atlananModel, atlananListe, pasiflestirilen);
+        }
     }
 }
 

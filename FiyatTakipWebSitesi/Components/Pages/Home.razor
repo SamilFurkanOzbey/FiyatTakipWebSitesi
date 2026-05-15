@@ -84,7 +84,7 @@
         ⭐ Takip Ettiklerim Sayfasına Git
     </NavLink>
 
-    @if (!tumUrunler.Any())
+    @if (!urunVarMi)
     {
         <div class="seed-banner">
             <div class="seed-content">
@@ -121,6 +121,32 @@
 
     @if (secilenKategori != null && gosterilenUrunler.Any())
     {
+        <!-- ── SIRALAMA ÇUBUĞU ── -->
+        <div class="siralama-bar">
+            <span class="siralama-etiket">Sırala:</span>
+
+            <button class="siralama-btn @(aktifSiralama == "fiyat-asc" ? "aktif" : "")"
+                    @onclick="FiyatArtanSirala">
+                💰 Fiyat <span class="ok">↑</span>
+            </button>
+            <button class="siralama-btn @(aktifSiralama == "fiyat-desc" ? "aktif" : "")"
+                    @onclick="FiyatAzalanSirala">
+                💰 Fiyat <span class="ok">↓</span>
+            </button>
+
+            <div class="siralama-ayrac"></div>
+
+            <button class="siralama-btn @(aktifSiralama == "tarih-asc" ? "aktif" : "")"
+                    @onclick="TarihArtanSirala">
+                📅 Tarih <span class="ok">↑</span>
+            </button>
+            <button class="siralama-btn @(aktifSiralama == "tarih-desc" ? "aktif" : "")"
+                    @onclick="TarihAzalanSirala">
+                📅 Tarih <span class="ok">↓</span>
+            </button>
+        </div>
+        <!-- ── /SIRALAMA ÇUBUĞU ── -->
+
         <div class="urun-grid">
             @foreach (var urun in gosterilenUrunler)
             {
@@ -271,6 +297,67 @@
     .ekle-link { display: inline-block; margin-top: 12px; color: #38bdf8; text-decoration: none; font-weight: 600; }
     .ekle-link:hover { text-decoration: underline; }
 
+    /* ── SIRALAMA ÇUBUĞU ── */
+    .siralama-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        padding: 12px 18px;
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid #334155;
+        border-radius: 14px;
+        animation: fadeIn 0.3s ease-out;
+    }
+    .siralama-etiket {
+        color: #64748b;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-right: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .siralama-btn {
+        background: rgba(15, 23, 42, 0.6);
+        color: #94a3b8;
+        border: 1px solid #334155;
+        padding: 8px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 0.88rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .siralama-btn:hover {
+        border-color: #64748b;
+        color: #e2e8f0;
+        background: rgba(30, 41, 59, 0.9);
+        transform: translateY(-1px);
+    }
+    .siralama-btn.aktif {
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        border-color: #38bdf8;
+        color: white;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+    }
+    .siralama-btn .ok {
+        font-size: 1rem;
+        font-weight: 700;
+    }
+    .siralama-ayrac {
+        width: 1px;
+        height: 24px;
+        background: #334155;
+        margin: 0 4px;
+    }
+    /* ── /SIRALAMA ÇUBUĞU ── */
+
     /* ── ARAMA ÇUBUĞU ── */
     .search-wrapper {
         position: relative;
@@ -393,9 +480,12 @@
 @code {
     // ── Kategori & Ürün Listesi ──
     List<FiyatTakipWebSitesi.Models.Kategori> kategoriler = new();
-    List<FiyatTakipWebSitesi.Models.Urun> tumUrunler = new();
     List<FiyatTakipWebSitesi.Models.Urun> gosterilenUrunler = new();
     FiyatTakipWebSitesi.Models.Kategori? secilenKategori = null;
+    bool urunVarMi = false;
+
+    // ── Sıralama ──
+    string aktifSiralama = "tarih-desc"; // varsayılan: en yeni
 
     // ── Arama ──
     string aramaMetni = "";
@@ -408,13 +498,14 @@
     protected override async Task OnInitializedAsync()
     {
         kategoriler = await KategoriServisi.GetAllAsync();
-        tumUrunler = await UrunServisi.GetAllAsync();
+        var ornek = await UrunServisi.GetAllAsync(skip: 0, take: 1);
+        urunVarMi = ornek.Any();
 
         if (kategoriler.Any())
-            KategoriToggle(kategoriler.First());
+            await KategoriToggle(kategoriler.First());
     }
 
-    void KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
+    async Task KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
     {
         if (secilenKategori?.Id == kategori.Id)
         {
@@ -424,8 +515,32 @@
         else
         {
             secilenKategori = kategori;
-            gosterilenUrunler = tumUrunler.Where(x => x.KategoriId == kategori.Id && x.Aktif).ToList();
+            var filtre = await UrunServisi.GetByKategoriAsync(kategori.Id, take: 50);
+            gosterilenUrunler = UygulaSimdikiSiralama(filtre);
         }
+    }
+
+    void SiralamaUygula(string siralama)
+    {
+        aktifSiralama = siralama;
+        gosterilenUrunler = UygulaSimdikiSiralama(gosterilenUrunler);
+    }
+
+    void FiyatArtanSirala()  => SiralamaUygula("fiyat-asc");
+    void FiyatAzalanSirala() => SiralamaUygula("fiyat-desc");
+    void TarihArtanSirala()  => SiralamaUygula("tarih-asc");
+    void TarihAzalanSirala() => SiralamaUygula("tarih-desc");
+
+    List<FiyatTakipWebSitesi.Models.Urun> UygulaSimdikiSiralama(List<FiyatTakipWebSitesi.Models.Urun> liste)
+    {
+        return aktifSiralama switch
+        {
+            "fiyat-asc"  => liste.OrderBy(u => u.SonFiyati).ToList(),
+            "fiyat-desc" => liste.OrderByDescending(u => u.SonFiyati).ToList(),
+            "tarih-asc"  => liste.OrderBy(u => u.EklendigiTarih).ToList(),
+            "tarih-desc" => liste.OrderByDescending(u => u.EklendigiTarih).ToList(),
+            _            => liste
+        };
     }
 
     // ── Arama Metotları ──
@@ -526,12 +641,13 @@
         await UrunServisi.SeedOrnekUrunlerAsync();
 
         kategoriler = await KategoriServisi.GetAllAsync();
-        tumUrunler = await UrunServisi.GetAllAsync();
+        var ornek = await UrunServisi.GetAllAsync(skip: 0, take: 1);
+        urunVarMi = ornek.Any();
 
         if (kategoriler.Any())
         {
             secilenKategori = null;
-            KategoriToggle(kategoriler.First());
+            await KategoriToggle(kategoriler.First());
         }
 
         yukleniyor = false;
@@ -546,7 +662,7 @@
 
         await UrunServisi.SeedSifirlaAsync();
 
-        tumUrunler.Clear();
+        urunVarMi = false;
         gosterilenUrunler.Clear();
         secilenKategori = null;
 

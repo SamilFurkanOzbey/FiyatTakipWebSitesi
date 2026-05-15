@@ -16,6 +16,7 @@ using FiyatTakipWebSitesi.Models;
 using FiyatTakipWebSitesi.Services;
 using Microsoft.EntityFrameworkCore;
 using Polly;
+using Hangfire;
 
 namespace FiyatTakipWebSitesi.Jobs;
 

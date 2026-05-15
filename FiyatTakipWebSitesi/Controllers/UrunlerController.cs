@@ -57,22 +57,26 @@ public class UrunlerController(UrunService urunService, ILogger<UrunlerControlle
     /// <summary>Tüm aktif ürünleri listeler</summary>
     /// <param name="kategoriId">Opsiyonel: Kategoriye göre filtrele</param>
     /// <param name="kullaniciId">Opsiyonel: Kullanıcıya göre filtrele</param>
+    /// <param name="skip">Atlanacak kayıt sayısı (sayfalama için)</param>
+    /// <param name="take">Alınacak kayıt sayısı (sayfalama için)</param>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<UrunResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? kategoriId,
-        [FromQuery] int? kullaniciId)
+        [FromQuery] int? kullaniciId,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50)
     {
         try
         {
             List<Urun> urunler;
 
             if (kategoriId.HasValue)
-                urunler = await _urunService.GetByKategoriAsync(kategoriId.Value);
+                urunler = await _urunService.GetByKategoriAsync(kategoriId.Value, skip, take);
             else if (kullaniciId.HasValue)
-                urunler = await _urunService.GetByKullaniciAsync(kullaniciId.Value);
+                urunler = await _urunService.GetByKullaniciAsync(kullaniciId.Value); // Kullanıcı filtrelemesinde sayfalama eklenmediyse servise eklenebilir, şimdilik böyle bırakıyoruz
             else
-                urunler = await _urunService.GetAllAsync();
+                urunler = await _urunService.GetAllAsync(skip, take);
 
             var response = urunler.Select(u => _mapper.UrunToUrunResponse(u));
             return Ok(response);
