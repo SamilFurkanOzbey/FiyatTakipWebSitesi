@@ -11,6 +11,7 @@
 @inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
 @inject FiyatTakipWebSitesi.Data.ApplicationDbContext Db
 @inject NavigationManager NavManager
+@inject ILogger<Hesap> Logger
 @using FiyatTakipWebSitesi.DTOs
 @using Microsoft.EntityFrameworkCore
 @implements IDisposable
@@ -379,12 +380,15 @@
         }
         catch (UnauthorizedAccessException ex)
         {
+            // Servis kullanıcı dostu mesaj döndürüyor (ör. "E-posta veya şifre hatalı")
             mesaj = ex.Message;
             mesajHata = true;
         }
         catch (Exception ex)
         {
-            mesaj = $"Giriş başarısız: {ex.Message}";
+            // Teknik detay log'a düşsün, kullanıcı sade bir mesaj görsün
+            Logger.LogError(ex, "[Hesap] Giriş hatası");
+            mesaj = "Giriş yapılamadı. Lütfen biraz sonra tekrar dene.";
             mesajHata = true;
         }
         finally
@@ -432,12 +436,15 @@
         }
         catch (InvalidOperationException ex)
         {
+            // Servis kullanıcı dostu mesaj döndürüyor (ör. "Bu e-posta zaten kullanılıyor")
             mesaj = ex.Message;
             mesajHata = true;
         }
         catch (Exception ex)
         {
-            mesaj = $"Kayıt başarısız: {ex.Message}";
+            // Teknik detay log'a düşsün, kullanıcı sade bir mesaj görsün
+            Logger.LogError(ex, "[Hesap] Kayıt hatası");
+            mesaj = "Hesap oluşturulamadı. Lütfen biraz sonra tekrar dene.";
             mesajHata = true;
         }
         finally

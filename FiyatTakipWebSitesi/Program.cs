@@ -3,7 +3,7 @@ using FiyatTakipWebSitesi.Data;
 using FiyatTakipWebSitesi.Jobs;
 using FiyatTakipWebSitesi.Services;
 using Hangfire;
-using Hangfire.SqlServer;
+using Hangfire.MemoryStorage;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.RateLimiting;
@@ -65,21 +65,14 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("'DefaultConnection' bağlantı dizesi bulunamadı.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlite(connectionString));
 
-// ── Hangfire ─────────────────────────────────────────────────────────────────
+// ── Hangfire (SQLite kullandığımız için in-memory storage) ───────────────────
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
-    {
-        CommandBatchMaxTimeout       = TimeSpan.FromMinutes(5),
-        SlidingInvisibilityTimeout  = TimeSpan.FromMinutes(5),
-        QueuePollInterval           = TimeSpan.Zero,
-        UseRecommendedIsolationLevel = true,
-        DisableGlobalLocks           = true
-    }));
+    .UseMemoryStorage());
 
 builder.Services.AddHangfireServer(options =>
 {

@@ -70,8 +70,10 @@ public class KullaniciService(
     public async Task<AuthResponse> GirisAsync(GirisRequest istek)
     {
         var email = istek.Email.Trim();
+        // SQLite'ta string.Equals(StringComparison.OrdinalIgnoreCase) çevrilmiyor.
+        // SQLite'ın varsayılan LIKE'ı zaten case-insensitive — onu kullanıyoruz.
         var kullanici = await _context.Kullanicilar
-            .FirstOrDefaultAsync(k => string.Equals(k.Email, email, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefaultAsync(k => EF.Functions.Like(k.Email, email));
 
         if (kullanici is null || kullanici.SifreHash is null || kullanici.SifreTuzu is null)
             throw new UnauthorizedAccessException("E-posta veya şifre hatalı.");

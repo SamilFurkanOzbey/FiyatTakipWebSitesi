@@ -510,8 +510,10 @@
         }
         catch (Exception ex)
         {
+            // Teknik detay log'a, kullanıcı sade mesaj görsün
+            Console.Error.WriteLine($"[DemoPaneli] Kullanıcı oluşturma hatası: {ex}");
             kayitBasarili = false;
-            kayitMesaji = $"✗ Beklenmeyen hata: {ex.Message}";
+            kayitMesaji = "✗ Kullanıcı oluşturulamadı. Bilgileri kontrol edip tekrar dene.";
         }
         finally
         {

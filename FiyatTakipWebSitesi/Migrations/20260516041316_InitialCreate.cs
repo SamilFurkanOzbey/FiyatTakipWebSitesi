@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FiyatTakipWebSitesi.Migrations
 {
     /// <inheritdoc />
-    public partial class TemizBaslangic : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -52,6 +52,29 @@ namespace FiyatTakipWebSitesi.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "UrunModelleri",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Ad = table.Column<string>(type: "TEXT", nullable: false),
+                    Aciklama = table.Column<string>(type: "TEXT", nullable: true),
+                    Resim = table.Column<string>(type: "TEXT", nullable: true),
+                    KategoriId = table.Column<int>(type: "INTEGER", nullable: false),
+                    OlusturulmaTarihi = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    Aktif = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UrunModelleri", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UrunModelleri_Kategoriler_KategoriId",
+                        column: x => x.KategoriId,
+                        principalTable: "Kategoriler",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Urunler",
                 columns: table => new
                 {
@@ -60,8 +83,11 @@ namespace FiyatTakipWebSitesi.Migrations
                     Ad = table.Column<string>(type: "TEXT", nullable: false),
                     URL = table.Column<string>(type: "TEXT", nullable: false),
                     Resim = table.Column<string>(type: "TEXT", nullable: true),
+                    Satici = table.Column<string>(type: "TEXT", nullable: false),
+                    ParaBirimi = table.Column<string>(type: "TEXT", nullable: false),
                     KategoriId = table.Column<int>(type: "INTEGER", nullable: false),
                     UserId = table.Column<int>(type: "INTEGER", nullable: true),
+                    UrunModeliId = table.Column<int>(type: "INTEGER", nullable: true),
                     BaslangicFiyati = table.Column<decimal>(type: "TEXT", precision: 10, scale: 2, nullable: false),
                     SonFiyati = table.Column<decimal>(type: "TEXT", precision: 10, scale: 2, nullable: false),
                     EklendigiTarih = table.Column<DateTime>(type: "TEXT", nullable: false),
@@ -86,6 +112,12 @@ namespace FiyatTakipWebSitesi.Migrations
                         principalTable: "Kullanicilar",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Urunler_UrunModelleri_UrunModeliId",
+                        column: x => x.UrunModeliId,
+                        principalTable: "UrunModelleri",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -96,6 +128,7 @@ namespace FiyatTakipWebSitesi.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     UrunId = table.Column<int>(type: "INTEGER", nullable: false),
                     Fiyat = table.Column<decimal>(type: "TEXT", precision: 10, scale: 2, nullable: false),
+                    ParaBirimi = table.Column<string>(type: "TEXT", nullable: false),
                     Tarih = table.Column<DateTime>(type: "TEXT", nullable: false),
                     OncekiFiyat = table.Column<decimal>(type: "TEXT", precision: 10, scale: 2, nullable: true),
                     FiyatDegisimi = table.Column<decimal>(type: "TEXT", precision: 10, scale: 2, nullable: true),
@@ -168,9 +201,19 @@ namespace FiyatTakipWebSitesi.Migrations
                 column: "KategoriId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Urunler_UrunModeliId",
+                table: "Urunler",
+                column: "UrunModeliId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Urunler_UserId",
                 table: "Urunler",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UrunModelleri_KategoriId",
+                table: "UrunModelleri",
+                column: "KategoriId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Uyarilar_OlusturulmaTarihi",
@@ -201,10 +244,13 @@ namespace FiyatTakipWebSitesi.Migrations
                 name: "Urunler");
 
             migrationBuilder.DropTable(
-                name: "Kategoriler");
+                name: "Kullanicilar");
 
             migrationBuilder.DropTable(
-                name: "Kullanicilar");
+                name: "UrunModelleri");
+
+            migrationBuilder.DropTable(
+                name: "Kategoriler");
         }
     }
 }
