@@ -17,21 +17,14 @@ namespace FiyatTakipWebSitesi.Controllers;
 [ApiController]
 [Route("api/fiyat-sorgula")]
 [Produces("application/json")]
-public class FiyatSorgulaController : ControllerBase
+public class FiyatSorgulaController(
+    ScraperService scraperService,
+    UrunService urunService,
+    ILogger<FiyatSorgulaController> logger) : ControllerBase
 {
-    private readonly ScraperService _scraperService;
-    private readonly UrunService _urunService;
-    private readonly ILogger<FiyatSorgulaController> _logger;
-
-    public FiyatSorgulaController(
-        ScraperService scraperService,
-        UrunService urunService,
-        ILogger<FiyatSorgulaController> logger)
-    {
-        _scraperService = scraperService;
-        _urunService = urunService;
-        _logger = logger;
-    }
+    private readonly ScraperService _scraperService = scraperService;
+    private readonly UrunService _urunService = urunService;
+    private readonly ILogger<FiyatSorgulaController> _logger = logger;
 
     // ── POST /api/fiyat-sorgula ───────────────────────
     /// <summary>
@@ -50,7 +43,10 @@ public class FiyatSorgulaController : ControllerBase
         if (!Uri.TryCreate(istek.URL, UriKind.Absolute, out _))
             return BadRequest(new { hata = "URL formatı geçersiz." });
 
-        _logger.LogInformation("Fiyat sorgulanıyor: {URL}", istek.URL);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Fiyat sorgulanıyor: {URL}", istek.URL);
+        }
 
         try
         {
@@ -79,9 +75,12 @@ public class FiyatSorgulaController : ControllerBase
             if (basarili && fiyatSayi.HasValue && istek.UrunId.HasValue)
             {
                 await _urunService.FiyatGuncelleAsync(istek.UrunId.Value, fiyatSayi.Value);
-                _logger.LogInformation(
-                    "Ürün {UrunId} fiyatı {Fiyat} TL olarak güncellendi.",
-                    istek.UrunId.Value, fiyatSayi.Value);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation(
+                        "Ürün {UrunId} fiyatı {Fiyat} TL olarak güncellendi.",
+                        istek.UrunId.Value, fiyatSayi.Value);
+                }
             }
 
             var yanit = new FiyatSorgulaResponse

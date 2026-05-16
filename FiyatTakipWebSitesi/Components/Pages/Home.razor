@@ -1,682 +1,183 @@
-@page "/"
+﻿@page "/"
 @rendermode InteractiveServer
-@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
-@inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
 @inject NavigationManager NavManager
-<PageTitle>Ana Sayfa</PageTitle>
+
+<PageTitle>Ana Sayfa | Fiyat Takip</PageTitle>
 
 <div class="home-container">
 
     <div class="hero">
         <h1>Fiyat Takip</h1>
         <p>Ürünleri incele ve fiyat geçmişlerini takip et.</p>
-
-        <!-- ── ARAMA ÇUBUĞU ── -->
-        <div class="search-wrapper" id="search-wrapper">
-            <div class="search-box @(aramaAktif ? "focused" : "")">
-                <span class="search-icon">🔍</span>
-                <input id="search-input"
-                       type="text"
-                       placeholder="Ürün adı ara... (en az 2 karakter)"
-                       autocomplete="off"
-                       value="@aramaMetni"
-                       @oninput="AramaGuncelle"
-                       @onfocus="() => { aramaAktif = true; }"
-                       @onkeydown="TusaBas" />
-                @if (!string.IsNullOrEmpty(aramaMetni))
-                {
-                    <button class="clear-btn" @onclick="AramaTemizle" title="Temizle">✕</button>
-                }
-            </div>
-
-            @if (oneriListesi.Count > 0)
-            {
-                <div class="dropdown-panel" id="search-dropdown">
-                    @for (int i = 0; i < oneriListesi.Count; i++)
-                    {
-                        var idx = i;
-                        var oneri = oneriListesi[i];
-                        <div class="dropdown-item @(seciliOneriIndex == idx ? "highlighted" : "")"
-                             @onclick="() => OneriSec(oneri)"
-                             @onmouseover="() => seciliOneriIndex = idx">
-                            <div class="oneri-resim">
-                                @if (!string.IsNullOrEmpty(oneri.Resim))
-                                {
-                                    <img src="@oneri.Resim" alt="@oneri.Ad" />
-                                }
-                                else
-                                {
-                                    <span class="oneri-resim-yok">🖼️</span>
-                                }
-                            </div>
-                            <div class="oneri-bilgi">
-                                <span class="oneri-ad">@oneri.Ad</span>
-                                <span class="oneri-alt">
-                                    <span class="oneri-fiyat">@oneri.SonFiyati.ToString("N2") @oneri.ParaBirimi</span>
-                                    @if (!string.IsNullOrEmpty(oneri.Kategori))
-                                    {
-                                        <span class="oneri-kategori">📦 @oneri.Kategori</span>
-                                    }
-                                </span>
-                            </div>
-                            <span class="oneri-ok">→</span>
-                        </div>
-                    }
-                </div>
-            }
-            else if (aramaYukleniyor)
-            {
-                <div class="dropdown-panel">
-                    <div class="dropdown-yukleniyor">⏳ Aranıyor...</div>
-                </div>
-            }
-            else if (!string.IsNullOrEmpty(aramaMetni) && aramaMetni.Length >= 2 && !aramaYukleniyor)
-            {
-                <div class="dropdown-panel">
-                    <div class="dropdown-bos">Sonuç bulunamadı 😕</div>
-                </div>
-            }
-        </div>
-        <!-- ── /ARAMA ÇUBUĞU ── -->
     </div>
 
-    <NavLink href="/takip" class="tum-kategori-btn">
-        ⭐ Takip Ettiklerim Sayfasına Git
+    <NavLink href="/kategoriler" class="tum-kategori-btn">
+        Tüm Kategoriler
     </NavLink>
 
-    @if (!urunVarMi)
-    {
-        <div class="seed-banner">
-            <div class="seed-content">
-                <h3>🚀 Veritabanınızda Henüz Ürün Yok</h3>
-                <p>Uygulamanın zengin arayüzünü ve grafiklerini hızlıca test etmek için örnek verileri yükleyebilirsiniz.</p>
-            </div>
-            <button class="seed-btn" @onclick="OrnekVeriYukleAsync" disabled="@yukleniyor">
-                @(yukleniyor ? "⏳ Yükleniyor..." : "✨ Örnek Veri Yükle (Seed)")
-            </button>
-        </div>
-    }
-    else
-    {
-        <div class="seed-banner seed-banner-danger">
-            <div class="seed-content">
-                <h3>🗑️ Tüm Ürünleri Sil</h3>
-                <p>Veritabanındaki tüm ürünleri (örnek veriler dahil) kalıcı olarak silebilirsiniz.</p>
-            </div>
-            <button class="seed-btn seed-btn-danger" @onclick="TumUrunleriSilAsync" disabled="@yukleniyor">
-                @(yukleniyor ? "⏳ Siliniyor..." : "🗑️ Tümünü Kalıcı Sil")
-            </button>
-        </div>
-    }
-
     <div class="kategori-row">
+        <button class="kategori-btn seed-btn" @onclick="OrnekVeriYukle" title="Veritabanı boşsa örnek veri doldurur">
+            📦 Örnek Veri Yükle (Seed)
+        </button>
+
         @foreach (var kategori in kategoriler)
         {
-            <button class="kategori-btn @(secilenKategori?.Id == kategori.Id ? "active" : "")"
+            <button class="kategori-btn @(secilenKategori == kategori ? "active" : "")"
                     @onclick="() => KategoriToggle(kategori)">
-                @kategori.Ad @(secilenKategori?.Id == kategori.Id ? "▲" : "▼")
+                @kategori @(secilenKategori == kategori ? "▲" : "▼")
             </button>
         }
     </div>
 
-    @if (secilenKategori != null && gosterilenUrunler.Any())
+    @if (!string.IsNullOrEmpty(secilenKategori) && gosterilenUrunler.Any())
     {
-        <!-- ── SIRALAMA ÇUBUĞU ── -->
-        <div class="siralama-bar">
-            <span class="siralama-etiket">Sırala:</span>
-
-            <button class="siralama-btn @(aktifSiralama == "fiyat-asc" ? "aktif" : "")"
-                    @onclick="FiyatArtanSirala">
-                💰 Fiyat <span class="ok">↑</span>
-            </button>
-            <button class="siralama-btn @(aktifSiralama == "fiyat-desc" ? "aktif" : "")"
-                    @onclick="FiyatAzalanSirala">
-                💰 Fiyat <span class="ok">↓</span>
-            </button>
-
-            <div class="siralama-ayrac"></div>
-
-            <button class="siralama-btn @(aktifSiralama == "tarih-asc" ? "aktif" : "")"
-                    @onclick="TarihArtanSirala">
-                📅 Tarih <span class="ok">↑</span>
-            </button>
-            <button class="siralama-btn @(aktifSiralama == "tarih-desc" ? "aktif" : "")"
-                    @onclick="TarihAzalanSirala">
-                📅 Tarih <span class="ok">↓</span>
-            </button>
-        </div>
-        <!-- ── /SIRALAMA ÇUBUĞU ── -->
-
         <div class="urun-grid">
             @foreach (var urun in gosterilenUrunler)
             {
                 <div class="urun-card">
-                    @if (!string.IsNullOrEmpty(urun.Resim))
-                    {
-                        <img src="@urun.Resim" alt="@urun.Ad" />
-                    }
-                    else
-                    {
-                        <div class="resim-placeholder">🖼️</div>
-                    }
+                    <button class="takip-btn" title="Takibe Al" @onclick="() => TakibeEkle(urun)">
+                        <i class="bi bi-plus-lg">+</i>
+                        <span class="tooltip-text">Takibe Al</span>
+                    </button>
+
+                    <img src="@urun.Resim" alt="@urun.Ad" />
                     <h4>@urun.Ad</h4>
-                    <p class="fiyat">@urun.SonFiyati.ToString("N2") @urun.ParaBirimi</p>
-                    <p class="satici">🏪 @(string.IsNullOrEmpty(urun.Satici) ? "Bilinmiyor" : urun.Satici)</p>
+                    <p class="fiyat">@urun.Fiyat</p>
 
                     <div class="btn-row">
-                        <NavLink href="@($"/urundetay/{urun.Id}")" class="detay-btn">Detay</NavLink>
-                        <NavLink href="@($"/grafik/{urun.Id}")" class="grafik-btn">Grafik</NavLink>
+                        <NavLink href="/urundetay" class="detay-btn">Detay</NavLink>
+                        <NavLink href="/grafik" class="grafik-btn">Grafik</NavLink>
                     </div>
                 </div>
             }
         </div>
     }
-    else if (secilenKategori != null)
+    else if (!string.IsNullOrEmpty(secilenKategori))
     {
         <div class="bos-uyari">
-            <p>Bu kategoriye ait henüz takip edilen bir ürün bulunmuyor.</p>
-            <NavLink href="/takip" class="ekle-link">Hemen Ürün Ekle</NavLink>
-        </div>
-    }
-    else
-    {
-        <div class="bos-uyari">
-            <p>👆 Ürünlerini görmek için yukarıdan bir kategori seçin.</p>
+            <p>Bu kategori için örnek veriler hazırlanıyor...</p>
         </div>
     }
 
 </div>
 
 <style>
-    .seed-banner {
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(56, 189, 248, 0.3);
-        padding: 24px 32px;
-        border-radius: 20px;
-        margin-bottom: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        animation: fadeIn 0.5s ease-out;
-    }
-    .seed-content h3 { color: #38bdf8; font-size: 1.3rem; font-weight: bold; margin-bottom: 6px; }
-    .seed-content p { color: #cbd5e1; font-size: 0.95rem; margin: 0; }
-    .seed-btn {
-        background: linear-gradient(135deg, #0284c7, #2563eb);
-        color: white;
-        border: none;
-        padding: 14px 28px;
-        border-radius: 14px;
-        font-weight: bold;
-        font-size: 1rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        white-space: nowrap;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
-    }
-    .seed-btn:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
-        background: linear-gradient(135deg, #0369a1, #1d4ed8);
-    }
-    .seed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-    .seed-banner-danger {
-        border-color: rgba(220, 38, 38, 0.35);
-    }
-    .seed-banner-danger .seed-content h3 { color: #f87171; }
-    .seed-btn-danger {
-        background: linear-gradient(135deg, #b91c1c, #dc2626);
-        box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
-    }
-    .seed-btn-danger:hover:not(:disabled) {
-        background: linear-gradient(135deg, #991b1b, #b91c1c);
-        box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6);
-    }
-
-    body { background: #0f172a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .home-container { padding: 30px; max-width: 1400px; margin: 0 auto; }
-    .hero h1 { font-size: 42px; font-weight: bold; background: linear-gradient(90deg, #38bdf8, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .hero p { color: #94a3b8; margin-bottom: 20px; font-size: 1.1rem; }
+    body { background: #0f172a; color: white; font-family: 'Segoe UI'; }
+    .home-container { padding: 30px; }
+    .hero h1 { font-size: 42px; font-weight: bold; }
+    .hero p { color: #94a3b8; margin-bottom: 20px; }
     
     .tum-kategori-btn { 
-        display: inline-block; 
-        background: #1e293b; 
-        color: #38bdf8; 
-        text-decoration: none; 
-        padding: 12px 24px; 
-        border: 1px solid #38bdf8;
-        border-radius: 12px; 
-        margin-bottom: 30px;
-        font-weight: 600;
-        transition: all 0.3s ease;
+        display: inline-block; background: #334155; color: white; 
+        text-decoration: none; padding: 10px 20px; border-radius: 10px; 
+        margin-bottom: 30px; font-size: 14px; transition: 0.3s;
     }
-    .tum-kategori-btn:hover { background: #38bdf8; color: #0f172a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2); }
+    .tum-kategori-btn:hover { background: #475569; }
 
     .kategori-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 30px; }
     
     .kategori-btn { 
-        background: #1e293b; 
-        color: #cbd5e1; 
-        border: 1px solid #334155; 
-        padding: 12px 22px; 
-        border-radius: 12px; 
-        cursor: pointer; 
-        font-size: 15px;
-        font-weight: 600;
-        transition: all 0.3s ease;
+        background: #1e293b; color: white; border: 2px solid #334155; 
+        padding: 12px 22px; border-radius: 14px; cursor: pointer; 
+        font-size: 16px; transition: 0.3s;
     }
-    .kategori-btn:hover { border-color: #64748b; color: white; }
-    .kategori-btn.active { background: #0284c7; color: white; border-color: #38bdf8; box-shadow: 0 0 15px rgba(2, 132, 199, 0.4); }
+    .kategori-btn.active { background: #0284c7; border-color: #38bdf8; }
 
-    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; animation: fadeIn 0.4s ease-out; }
-    
-    @@keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    /* Seed butonu özel stili */
+    .seed-btn { background: #059669; border-color: #047857; color: #fff; font-weight:bold; }
+    .seed-btn:hover { background: #10b981; }
+
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+
+    .urun-card { 
+        background: #1e293b; padding: 15px; border-radius: 18px; 
+        border: 1px solid #334155; position: relative; transition: 0.3s;
     }
 
-    .urun-card { background: #1e293b; padding: 18px; border-radius: 18px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }
-    .urun-card:hover { transform: translateY(-4px); border-color: #475569; }
-    .urun-card img { width: 100%; height: 180px; object-fit: contain; background: white; border-radius: 12px; padding: 10px; margin-bottom: 12px; }
-    .resim-placeholder { width: 100%; height: 180px; background: #0f172a; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin-bottom: 12px; }
-    .urun-card h4 { font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .fiyat { color: #38bdf8; font-weight: 700; font-size: 1.25rem; margin-bottom: 4px; }
-    .satici { font-size: 0.8rem; color: #94a3b8; margin-bottom: 16px; }
-    
-    .btn-row { display: flex; gap: 10px; margin-top: auto; }
-    .detay-btn { background: #475569; flex: 1; text-align: center; padding: 10px; border-radius: 10px; text-decoration: none; color: white; font-weight: 600; font-size: 0.9rem; transition: background 0.2s; }
-    .detay-btn:hover { background: #64748b; color: white; }
-    .grafik-btn { background: #0284c7; flex: 1; text-align: center; padding: 10px; border-radius: 10px; text-decoration: none; color: white; font-weight: 600; font-size: 0.9rem; transition: background 0.2s; }
-    .grafik-btn:hover { background: #0369a1; color: white; }
-    
-    .bos-uyari { padding: 40px; text-align: center; background: #1e293b; border-radius: 16px; border: 1px dashed #475569; color: #94a3b8; animation: fadeIn 0.3s; }
-    .ekle-link { display: inline-block; margin-top: 12px; color: #38bdf8; text-decoration: none; font-weight: 600; }
-    .ekle-link:hover { text-decoration: underline; }
+    .takip-btn {
+        position: absolute; top: 15px; right: 15px; width: 35px; height: 35px;
+        border-radius: 50%; background: #38bdf8; color: #0f172a; border: none;
+        font-weight: bold; font-size: 20px; cursor: pointer; z-index: 10;
+        display: flex; align-items: center; justify-content: center;
+        transition: 0.3s;
+    }
+    .takip-btn:hover { transform: scale(1.1); background: #0ea5e9; }
 
-    /* ── SIRALAMA ÇUBUĞU ── */
-    .siralama-bar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-bottom: 20px;
-        padding: 12px 18px;
-        background: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(12px);
-        border: 1px solid #334155;
-        border-radius: 14px;
-        animation: fadeIn 0.3s ease-out;
+    .tooltip-text {
+        visibility: hidden; width: 80px; background-color: #334155;
+        color: #fff; text-align: center; border-radius: 6px;
+        padding: 5px; position: absolute; z-index: 11;
+        bottom: 125%; left: 50%; margin-left: -40px; opacity: 0;
+        transition: opacity 0.3s; font-size: 12px;
     }
-    .siralama-etiket {
-        color: #64748b;
-        font-size: 0.85rem;
-        font-weight: 600;
-        margin-right: 4px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    .siralama-btn {
-        background: rgba(15, 23, 42, 0.6);
-        color: #94a3b8;
-        border: 1px solid #334155;
-        padding: 8px 16px;
-        border-radius: 10px;
-        cursor: pointer;
-        font-size: 0.88rem;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        white-space: nowrap;
-    }
-    .siralama-btn:hover {
-        border-color: #64748b;
-        color: #e2e8f0;
-        background: rgba(30, 41, 59, 0.9);
-        transform: translateY(-1px);
-    }
-    .siralama-btn.aktif {
-        background: linear-gradient(135deg, #0284c7, #2563eb);
-        border-color: #38bdf8;
-        color: white;
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
-    }
-    .siralama-btn .ok {
-        font-size: 1rem;
-        font-weight: 700;
-    }
-    .siralama-ayrac {
-        width: 1px;
-        height: 24px;
-        background: #334155;
-        margin: 0 4px;
-    }
-    /* ── /SIRALAMA ÇUBUĞU ── */
+    .takip-btn:hover .tooltip-text { visibility: visible; opacity: 1; }
 
-    /* ── ARAMA ÇUBUĞU ── */
-    .search-wrapper {
-        position: relative;
-        width: 100%;
-        max-width: 680px;
-        margin: 24px auto 8px;
-    }
-    .search-box {
-        display: flex;
-        align-items: center;
-        background: rgba(30, 41, 59, 0.85);
-        backdrop-filter: blur(16px);
-        border: 1.5px solid #334155;
-        border-radius: 16px;
-        padding: 0 18px;
-        gap: 12px;
-        transition: border-color 0.25s ease, box-shadow 0.25s ease;
-    }
-    .search-box.focused {
-        border-color: #38bdf8;
-        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15), 0 8px 32px rgba(0,0,0,0.4);
-    }
-    .search-icon { font-size: 1.2rem; flex-shrink: 0; }
-    .search-box input {
-        flex: 1;
-        background: transparent;
-        border: none;
-        outline: none;
-        color: #f1f5f9;
-        font-size: 1rem;
-        padding: 16px 0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .search-box input::placeholder { color: #64748b; }
-    .clear-btn {
-        background: none;
-        border: none;
-        color: #64748b;
-        font-size: 1rem;
-        cursor: pointer;
-        padding: 4px 6px;
-        border-radius: 6px;
-        transition: color 0.2s, background 0.2s;
-        flex-shrink: 0;
-    }
-    .clear-btn:hover { color: #f1f5f9; background: rgba(255,255,255,0.07); }
-    .dropdown-panel {
-        position: absolute;
-        top: calc(100% + 6px);
-        left: 0;
-        right: 0;
-        background: rgba(15, 23, 42, 0.97);
-        backdrop-filter: blur(20px);
-        border: 1.5px solid #334155;
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-        z-index: 1000;
-        animation: dropdownSlide 0.18s ease-out;
-    }
-    @@keyframes dropdownSlide {
-        from { opacity: 0; transform: translateY(-6px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-    .dropdown-item {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 12px 18px;
-        cursor: pointer;
-        border-bottom: 1px solid rgba(51,65,85,0.5);
-        transition: background 0.15s ease;
-    }
-    .dropdown-item:last-child { border-bottom: none; }
-    .dropdown-item:hover, .dropdown-item.highlighted {
-        background: rgba(56, 189, 248, 0.08);
-    }
-    .oneri-resim {
-        width: 50px;
-        height: 50px;
-        flex-shrink: 0;
-        background: white;
-        border-radius: 10px;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .oneri-resim img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
-    .oneri-resim-yok { font-size: 1.5rem; }
-    .oneri-bilgi {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-width: 0;
-    }
-    .oneri-ad {
-        color: #f1f5f9;
-        font-size: 0.92rem;
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .oneri-alt { display: flex; align-items: center; gap: 10px; }
-    .oneri-fiyat { color: #38bdf8; font-size: 0.88rem; font-weight: 700; }
-    .oneri-kategori { color: #64748b; font-size: 0.78rem; }
-    .oneri-ok { color: #475569; font-size: 1rem; flex-shrink: 0; transition: color 0.15s; }
-    .dropdown-item:hover .oneri-ok, .dropdown-item.highlighted .oneri-ok { color: #38bdf8; }
-    .dropdown-yukleniyor, .dropdown-bos {
-        padding: 20px;
-        text-align: center;
-        color: #64748b;
-        font-size: 0.95rem;
-    }
-    /* ── /ARAMA ÇUBUĞU ── */
+    .urun-card img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; }
+    .fiyat { color: #38bdf8; font-weight: bold; font-size: 1.2rem; margin: 10px 0; }
+    .btn-row { display: flex; gap: 10px; margin-top: 15px; }
+    .detay-btn { background: #475569; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
+    .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:10px; border-radius:10px; text-decoration:none; color:white; }
 </style>
 
 @code {
-    // ── Kategori & Ürün Listesi ──
-    List<FiyatTakipWebSitesi.Models.Kategori> kategoriler = new();
-    List<FiyatTakipWebSitesi.Models.Urun> gosterilenUrunler = new();
-    FiyatTakipWebSitesi.Models.Kategori? secilenKategori = null;
-    bool urunVarMi = false;
+    List<string> kategoriler = new() { "Elektronik", "Moda", "Ev", "Spor", "Kitap", "Kozmetik" };
+    List<Urun> tumUrunler = new();
+    List<Urun> gosterilenUrunler = new();
+    string secilenKategori = "";
 
-    // ── Sıralama ──
-    string aktifSiralama = "tarih-desc"; // varsayılan: en yeni
-
-    // ── Arama ──
-    string aramaMetni = "";
-    bool aramaAktif = false;
-    bool aramaYukleniyor = false;
-    int seciliOneriIndex = -1;
-    List<AramaOneriSonucu> oneriListesi = new();
-    CancellationTokenSource? _debounceCts;
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        kategoriler = await KategoriServisi.GetAllAsync();
-        var ornek = await UrunServisi.GetAllAsync(skip: 0, take: 1);
-        urunVarMi = ornek.Any();
-
-        if (kategoriler.Any())
-            await KategoriToggle(kategoriler.First());
+        UrunleriYukle();
+        KategoriSec("Elektronik");
     }
 
-    async Task KategoriToggle(FiyatTakipWebSitesi.Models.Kategori kategori)
+    async Task OrnekVeriYukle()
     {
-        if (secilenKategori?.Id == kategori.Id)
+        UrunleriYukle();
+        KategoriSec("Elektronik");
+    }
+
+    void UrunleriYukle()
+    {
+        tumUrunler.Clear();
+        string[] elektronikler = { "iPhone 15", "MacBook Air", "Sony WH-1000XM5", "Logitech G502", "Razer BlackWidow", "Samsung Odyssey G7", "iPad Pro", "Apple Watch S9", "Samsung T7 SSD", "Logitech C920", "JBL Flip 6", "Meta Quest 3" };
+        string[] modalar = { "Siyah Trençkot", "Oversize Hoodie", "Air Jordan 1", "Basic Beyaz Tişört", "Slim Fit Gömlek", "Chelsea Bot", "Ray-Ban Wayfarer", "North Face Çanta", "V Yaka Kazak", "Chino Pantolon", "Gece Elbisesi", "Kolombiya Mont" };
+
+        for (int i = 0; i < 12; i++)
         {
-            secilenKategori = null;
+            tumUrunler.Add(new Urun { Ad = elektronikler[i], Fiyat = $"{15000 + (i * 500)} TL", Kategori = "Elektronik", Resim = $"https://picsum.photos/400/300?random=e{i}" });
+            tumUrunler.Add(new Urun { Ad = modalar[i], Fiyat = $"{1200 + (i * 100)} TL", Kategori = "Moda", Resim = $"https://picsum.photos/400/600?random=m{i}" });
+        }
+    }
+
+    void KategoriSec(string kategori)
+    {
+        secilenKategori = kategori;
+        gosterilenUrunler = tumUrunler.Where(x => x.Kategori == kategori).ToList();
+    }
+
+    void KategoriToggle(string kategori)
+    {
+        if (secilenKategori == kategori)
+        {
+            secilenKategori = "";
             gosterilenUrunler.Clear();
         }
         else
         {
-            secilenKategori = kategori;
-            var filtre = await UrunServisi.GetByKategoriAsync(kategori.Id, take: 50);
-            gosterilenUrunler = UygulaSimdikiSiralama(filtre);
+            KategoriSec(kategori);
         }
     }
 
-    void SiralamaUygula(string siralama)
+    void TakibeEkle(Urun urun)
     {
-        aktifSiralama = siralama;
-        gosterilenUrunler = UygulaSimdikiSiralama(gosterilenUrunler);
+        NavManager.NavigateTo("/takip");
     }
 
-    void FiyatArtanSirala()  => SiralamaUygula("fiyat-asc");
-    void FiyatAzalanSirala() => SiralamaUygula("fiyat-desc");
-    void TarihArtanSirala()  => SiralamaUygula("tarih-asc");
-    void TarihAzalanSirala() => SiralamaUygula("tarih-desc");
-
-    List<FiyatTakipWebSitesi.Models.Urun> UygulaSimdikiSiralama(List<FiyatTakipWebSitesi.Models.Urun> liste)
-    {
-        return aktifSiralama switch
-        {
-            "fiyat-asc"  => liste.OrderBy(u => u.SonFiyati).ToList(),
-            "fiyat-desc" => liste.OrderByDescending(u => u.SonFiyati).ToList(),
-            "tarih-asc"  => liste.OrderBy(u => u.EklendigiTarih).ToList(),
-            "tarih-desc" => liste.OrderByDescending(u => u.EklendigiTarih).ToList(),
-            _            => liste
-        };
-    }
-
-    // ── Arama Metotları ──
-
-    async Task AramaGuncelle(ChangeEventArgs e)
-    {
-        aramaMetni = e.Value?.ToString() ?? "";
-        seciliOneriIndex = -1;
-
-        // Debounce: 300ms bekle
-        _debounceCts?.Cancel();
-        _debounceCts = new CancellationTokenSource();
-        var token = _debounceCts.Token;
-
-        if (aramaMetni.Length < 2)
-        {
-            oneriListesi.Clear();
-            aramaYukleniyor = false;
-            return;
-        }
-
-        aramaYukleniyor = true;
-        StateHasChanged();
-
-        try
-        {
-            await Task.Delay(300, token);
-            if (token.IsCancellationRequested) return;
-
-            var sonuclar = await UrunServisi.AraAsync(aramaMetni, limit: 8);
-            oneriListesi = sonuclar.Select(u => new AramaOneriSonucu
-            {
-                Id = u.Id,
-                Ad = u.Ad,
-                Resim = u.Resim,
-                SonFiyati = u.SonFiyati,
-                ParaBirimi = u.ParaBirimi,
-                Kategori = u.Kategori?.Ad ?? ""
-            }).ToList();
-        }
-        catch (TaskCanceledException) { /* debounce iptal - normal */ }
-        finally
-        {
-            aramaYukleniyor = false;
-            StateHasChanged();
-        }
-    }
-
-    void AramaTemizle()
-    {
-        aramaMetni = "";
-        oneriListesi.Clear();
-        aramaYukleniyor = false;
-        aramaAktif = false;
-        seciliOneriIndex = -1;
-        _debounceCts?.Cancel();
-    }
-
-    void OneriSec(AramaOneriSonucu oneri)
-    {
-        AramaTemizle();
-        NavManager.NavigateTo($"/urundetay/{oneri.Id}");
-    }
-
-    void TusaBas(KeyboardEventArgs e)
-    {
-        if (oneriListesi.Count == 0) return;
-
-        switch (e.Key)
-        {
-            case "ArrowDown":
-                seciliOneriIndex = Math.Min(seciliOneriIndex + 1, oneriListesi.Count - 1);
-                break;
-            case "ArrowUp":
-                seciliOneriIndex = Math.Max(seciliOneriIndex - 1, 0);
-                break;
-            case "Enter":
-                if (seciliOneriIndex >= 0 && seciliOneriIndex < oneriListesi.Count)
-                    OneriSec(oneriListesi[seciliOneriIndex]);
-                break;
-            case "Escape":
-                oneriListesi.Clear();
-                aramaAktif = false;
-                break;
-        }
-    }
-
-    // ── Seed ──
-    bool yukleniyor = false;
-
-    async Task OrnekVeriYukleAsync()
-    {
-        if (yukleniyor) return;
-        yukleniyor = true;
-        StateHasChanged();
-
-        await KategoriServisi.SeedVarsayilanKategorilerAsync();
-        await UrunServisi.SeedOrnekUrunlerAsync();
-
-        kategoriler = await KategoriServisi.GetAllAsync();
-        var ornek = await UrunServisi.GetAllAsync(skip: 0, take: 1);
-        urunVarMi = ornek.Any();
-
-        if (kategoriler.Any())
-        {
-            secilenKategori = null;
-            await KategoriToggle(kategoriler.First());
-        }
-
-        yukleniyor = false;
-        StateHasChanged();
-    }
-
-    async Task TumUrunleriSilAsync()
-    {
-        if (yukleniyor) return;
-        yukleniyor = true;
-        StateHasChanged();
-
-        await UrunServisi.SeedSifirlaAsync();
-
-        urunVarMi = false;
-        gosterilenUrunler.Clear();
-        secilenKategori = null;
-
-        yukleniyor = false;
-        StateHasChanged();
-    }
-    // ── Yardımcı Model ──
-    class AramaOneriSonucu
-    {
-        public int Id { get; set; }
+    class Urun {
         public string Ad { get; set; } = "";
-        public string? Resim { get; set; }
-        public decimal SonFiyati { get; set; }
-        public string ParaBirimi { get; set; } = "TRY";
+        public string Fiyat { get; set; } = "";
         public string Kategori { get; set; } = "";
+        public string Resim { get; set; } = "";
     }
 }
