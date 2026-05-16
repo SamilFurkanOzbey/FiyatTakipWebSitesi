@@ -1,84 +1,493 @@
-﻿@page "/hesap"
-
+@* =====================================================
+   Hesap.razor
+   Üç durumda farklı UI gösterir:
+   1) Giriş yapılmamış + "Giriş" tab → Login formu
+   2) Giriş yapılmamış + "Kayıt" tab → Register formu
+   3) Giriş yapılmış → Profil + email toggle + çıkış
+   ===================================================== *@
+@page "/hesap"
+@rendermode InteractiveServer
+@inject FiyatTakipWebSitesi.Services.KullaniciService KullaniciServisi
+@inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
+@inject FiyatTakipWebSitesi.Data.ApplicationDbContext Db
+@inject NavigationManager NavManager
+@using FiyatTakipWebSitesi.DTOs
+@using Microsoft.EntityFrameworkCore
+@implements IDisposable
 <PageTitle>Hesap</PageTitle>
 
 <div class="hesap-page">
 
-    ```
-    <div class="hesap-card">
+    @if (Oturum.GirisYapildi)
+    {
+        @* ── PROFIL ── *@
+        <div class="hesap-card profil">
+            <div class="avatar">👤</div>
+            <h2>@Oturum.Ad @Oturum.Soyad</h2>
+            <p class="mail">@Oturum.Email</p>
 
-        <div class="avatar">
-            👤
-        </div>
-
-        <h2>Kullanıcı Hesabı</h2>
-
-        <p class="mail">
-            ornekmail@gmail.com
-        </p>
-
-        <div class="istatistik">
-
-            <div class="box">
-                <h3>12</h3>
-                <span>Takip Edilen</span>
+            <div class="istatistik">
+                <div class="box">
+                    <h3>@takipSayisi</h3>
+                    <span>Takip Edilen</span>
+                </div>
+                <div class="box">
+                    <h3>@bildirimSayisi</h3>
+                    <span>Okunmamış</span>
+                </div>
             </div>
 
-            <div class="box">
-                <h3>5</h3>
-                <span>Bildirim</span>
+            <div class="ayar-blok">
+                <label class="toggle-row">
+                    <span>
+                        <strong>📧 E-posta Bildirimleri</strong>
+                        <small>Fiyat değişimlerinde mail gelsin mi?</small>
+                    </span>
+                    <input type="checkbox" @bind="emailBildirimAcik" @bind:after="EmailToggleKaydet" class="toggle" />
+                </label>
             </div>
 
+            @if (!string.IsNullOrEmpty(profilMesaji))
+            {
+                <p class="info-mesaj">@profilMesaji</p>
+            }
+
+            <button class="btn-cikis" @onclick="CikisYap">🚪 Çıkış Yap</button>
         </div>
+    }
+    else
+    {
+        @* ── GIRIS / KAYIT ── *@
+        <div class="hesap-card">
+            <div class="avatar">🔐</div>
+            <h2>@(aktifTab == "giris" ? "Giriş Yap" : "Kayıt Ol")</h2>
+            <p class="alt-yazi">@(aktifTab == "giris" ? "Hesabınla giriş yap ve ürün takibine başla." : "Yeni hesap oluştur, hemen başla.")</p>
 
-    </div>
-    ```
+            <div class="tab-bar">
+                <button class="tab @(aktifTab == "giris" ? "active" : "")" @onclick='() => TabDegistir("giris")'>Giriş</button>
+                <button class="tab @(aktifTab == "kayit" ? "active" : "")" @onclick='() => TabDegistir("kayit")'>Kayıt</button>
+            </div>
 
+            @if (aktifTab == "giris")
+            {
+                <div class="form">
+                    <input type="email" placeholder="E-posta" @bind="girisEmail" class="input" />
+                    <input type="password" placeholder="Şifre" @bind="girisSifre" class="input" />
+                    <button class="btn-ana" @onclick="GirisYap" disabled="@islemDevam">
+                        @(islemDevam ? "⏳ Giriş yapılıyor..." : "🔑 Giriş Yap")
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="form">
+                    <div class="iki-sutun">
+                        <input type="text" placeholder="Ad" @bind="kayitAd" class="input" />
+                        <input type="text" placeholder="Soyad" @bind="kayitSoyad" class="input" />
+                    </div>
+                    <input type="email" placeholder="E-posta" @bind="kayitEmail" class="input" />
+                    <input type="password" placeholder="Şifre (en az 6 karakter)" @bind="kayitSifre" class="input" />
+                    <button class="btn-ana" @onclick="KayitOl" disabled="@islemDevam">
+                        @(islemDevam ? "⏳ Oluşturuluyor..." : "✓ Hesap Oluştur")
+                    </button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(mesaj))
+            {
+                <p class="@(mesajHata ? "mesaj-hata" : "mesaj-basari")">@mesaj</p>
+            }
+
+            <p class="bilgi-yazi">
+                ℹ️ Üye olmadan ürün takip edemezsin. Kayıt olduktan sonra
+                fiyat değişimlerinde sana e-posta gelecek.
+            </p>
+        </div>
+    }
 </div>
 
 <style>
-
+    body { background: #0f172a; }
     .hesap-page {
-        min-height: 100vh;
+        min-height: calc(100vh - 60px);
         background: #0f172a;
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: flex-start;
+        padding: 50px 20px;
     }
 
     .hesap-card {
         background: #1e293b;
         color: white;
-        padding: 40px;
+        padding: 36px 32px;
         border-radius: 20px;
-        width: 400px;
+        width: 100%;
+        max-width: 460px;
         text-align: center;
+        border: 1px solid #334155;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
 
-    .avatar {
-        font-size: 5rem;
+    .avatar { font-size: 4rem; margin-bottom: 8px; }
+    .hesap-card h2 {
+        margin: 0 0 6px;
+        color: #f1f5f9;
+        font-size: 1.5rem;
     }
+    .alt-yazi { color: #94a3b8; font-size: 0.92rem; margin: 0 0 22px; }
+    .mail { color: #38bdf8; font-weight: 600; margin: 0 0 24px; }
 
-    .mail {
+    /* Tab bar */
+    .tab-bar {
+        display: flex;
+        gap: 6px;
+        background: #0f172a;
+        padding: 4px;
+        border-radius: 10px;
+        margin-bottom: 22px;
+    }
+    .tab {
+        flex: 1;
+        background: transparent;
         color: #94a3b8;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .tab.active {
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: white;
+    }
+    .tab:hover:not(.active) { color: #cbd5e1; }
+
+    /* Form */
+    .form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+    .iki-sutun { display: flex; gap: 10px; }
+    .iki-sutun .input { flex: 1; }
+    .input {
+        background: #0f172a;
+        color: white;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        padding: 13px 16px;
+        font-size: 0.95rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .input:focus { outline: none; border-color: #38bdf8; }
+
+    .btn-ana {
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 6px;
+    }
+    .btn-ana:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4);
+    }
+    .btn-ana:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .mesaj-basari {
+        color: #4ade80;
+        background: #052e16;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin: 14px 0 0;
+        border-left: 3px solid #16a34a;
+        text-align: left;
+        font-size: 0.92rem;
+    }
+    .mesaj-hata {
+        color: #fca5a5;
+        background: #450a0a;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin: 14px 0 0;
+        border-left: 3px solid #dc2626;
+        text-align: left;
+        font-size: 0.92rem;
+    }
+    .bilgi-yazi {
+        color: #64748b;
+        font-size: 0.84rem;
+        margin: 22px 0 0;
+        padding: 12px 14px;
+        background: #0f172a;
+        border-left: 3px solid #475569;
+        border-radius: 6px;
+        text-align: left;
+        line-height: 1.5;
     }
 
+    /* Profil */
     .istatistik {
         display: flex;
         justify-content: space-between;
-        margin-top: 30px;
+        gap: 12px;
+        margin: 24px 0 20px;
     }
-
     .box {
-        background: #111827;
-        padding: 20px;
-        border-radius: 14px;
-        width: 45%;
+        background: #0f172a;
+        padding: 18px 12px;
+        border-radius: 12px;
+        flex: 1;
+        border: 1px solid #334155;
+    }
+    .box h3 {
+        color: #60a5fa;
+        font-size: 2rem;
+        margin: 0 0 4px;
+        font-weight: 700;
+    }
+    .box span { color: #94a3b8; font-size: 0.85rem; }
+
+    .ayar-blok {
+        margin: 20px 0;
+        padding: 16px;
+        background: #0f172a;
+        border-radius: 12px;
+        border: 1px solid #334155;
+    }
+    .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        cursor: pointer;
+        text-align: left;
+    }
+    .toggle-row strong { color: #f1f5f9; display: block; font-size: 0.95rem; }
+    .toggle-row small { color: #94a3b8; display: block; font-size: 0.8rem; margin-top: 2px; }
+
+    .toggle {
+        appearance: none;
+        width: 46px; height: 26px;
+        background: #475569;
+        border-radius: 999px;
+        position: relative;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+    }
+    .toggle:checked { background: #16a34a; }
+    .toggle::before {
+        content: ''; position: absolute;
+        width: 20px; height: 20px;
+        background: white; border-radius: 50%;
+        top: 3px; left: 3px;
+        transition: transform 0.2s;
+    }
+    .toggle:checked::before { transform: translateX(20px); }
+
+    .btn-cikis {
+        background: #450a0a;
+        color: #fca5a5;
+        border: 1px solid #7f1d1d;
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.2s;
+        margin-top: 8px;
+    }
+    .btn-cikis:hover { background: #7f1d1d; color: white; }
+
+    .info-mesaj {
+        color: #4ade80;
+        font-size: 0.86rem;
+        margin: 4px 0 14px;
+    }
+</style>
+
+@code {
+    string aktifTab = "giris";
+    string girisEmail = "";
+    string girisSifre = "";
+    string kayitAd = "";
+    string kayitSoyad = "";
+    string kayitEmail = "";
+    string kayitSifre = "";
+    string mesaj = "";
+    bool mesajHata = false;
+    bool islemDevam = false;
+
+    // Profil tarafı
+    bool emailBildirimAcik = true;
+    int takipSayisi = 0;
+    int bildirimSayisi = 0;
+    string profilMesaji = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Oturum.Degisti += StateHasChanged;
+        if (Oturum.GirisYapildi)
+            await ProfilVerileriniYukle();
     }
 
-        .box h3 {
-            color: #60a5fa;
-            font-size: 2rem;
+    public void Dispose()
+    {
+        Oturum.Degisti -= StateHasChanged;
+    }
+
+    void TabDegistir(string yeni)
+    {
+        aktifTab = yeni;
+        mesaj = "";
+    }
+
+    async Task GirisYap()
+    {
+        if (string.IsNullOrWhiteSpace(girisEmail) || string.IsNullOrWhiteSpace(girisSifre))
+        {
+            mesaj = "E-posta ve şifre zorunlu.";
+            mesajHata = true;
+            return;
         }
 
-</style>
+        islemDevam = true;
+        mesaj = "";
+        StateHasChanged();
+
+        try
+        {
+            var istek = new GirisRequest { Email = girisEmail.Trim(), Sifre = girisSifre };
+            var yanit = await KullaniciServisi.GirisAsync(istek);
+
+            // OturumDurumu'na kullanıcı bilgisini yaz
+            var kullanici = await Db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == yanit.KullaniciId);
+            if (kullanici is not null)
+            {
+                Oturum.GirisYap(kullanici);
+                await ProfilVerileriniYukle();
+            }
+
+            mesaj = "";
+            girisSifre = ""; // şifre alanını temizle
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            mesaj = ex.Message;
+            mesajHata = true;
+        }
+        catch (Exception ex)
+        {
+            mesaj = $"Giriş başarısız: {ex.Message}";
+            mesajHata = true;
+        }
+        finally
+        {
+            islemDevam = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task KayitOl()
+    {
+        if (string.IsNullOrWhiteSpace(kayitAd) || string.IsNullOrWhiteSpace(kayitSoyad)
+            || string.IsNullOrWhiteSpace(kayitEmail) || (kayitSifre?.Length ?? 0) < 6)
+        {
+            mesaj = "Tüm alanları doldur. Şifre en az 6 karakter.";
+            mesajHata = true;
+            return;
+        }
+
+        islemDevam = true;
+        mesaj = "";
+        StateHasChanged();
+
+        try
+        {
+            var istek = new KayitRequest
+            {
+                Ad = kayitAd.Trim(),
+                Soyad = kayitSoyad.Trim(),
+                Email = kayitEmail.Trim(),
+                Sifre = kayitSifre!
+            };
+            var yanit = await KullaniciServisi.KayitAsync(istek);
+
+            // Kayıt sonrası otomatik giriş yap
+            var kullanici = await Db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == yanit.KullaniciId);
+            if (kullanici is not null)
+            {
+                Oturum.GirisYap(kullanici);
+                await ProfilVerileriniYukle();
+            }
+
+            // Formu temizle
+            kayitAd = ""; kayitSoyad = ""; kayitEmail = ""; kayitSifre = "";
+        }
+        catch (InvalidOperationException ex)
+        {
+            mesaj = ex.Message;
+            mesajHata = true;
+        }
+        catch (Exception ex)
+        {
+            mesaj = $"Kayıt başarısız: {ex.Message}";
+            mesajHata = true;
+        }
+        finally
+        {
+            islemDevam = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task ProfilVerileriniYukle()
+    {
+        if (!Oturum.KullaniciId.HasValue) return;
+        var uid = Oturum.KullaniciId.Value;
+
+        var kullanici = await Db.Kullanicilar.AsNoTracking().FirstOrDefaultAsync(k => k.Id == uid);
+        if (kullanici is not null)
+            emailBildirimAcik = kullanici.EmailBildirimleriniAc;
+
+        takipSayisi = await Db.Urunler.CountAsync(u => u.UserId == uid && u.Aktif);
+        bildirimSayisi = await Db.Uyarilar.CountAsync(u => u.UserId == uid && !u.Okundu);
+    }
+
+    async Task EmailToggleKaydet()
+    {
+        if (!Oturum.KullaniciId.HasValue) return;
+
+        var kullanici = await Db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == Oturum.KullaniciId.Value);
+        if (kullanici is null) return;
+
+        kullanici.EmailBildirimleriniAc = emailBildirimAcik;
+        await Db.SaveChangesAsync();
+
+        profilMesaji = emailBildirimAcik
+            ? "✓ E-posta bildirimleri AÇIK"
+            : "✓ E-posta bildirimleri KAPALI";
+        StateHasChanged();
+
+        // 3 saniye sonra mesajı kaldır
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            profilMesaji = "";
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    void CikisYap()
+    {
+        Oturum.CikisYap();
+        // Form alanlarını sıfırla
+        girisEmail = ""; girisSifre = "";
+        aktifTab = "giris";
+        mesaj = "";
+    }
+}

@@ -88,7 +88,15 @@ builder.Services.AddHangfireServer(options =>
 
 // ── Repositories & Services ───────────────────────────────────────────────────
 builder.Services.AddScoped(typeof(FiyatTakipWebSitesi.Repositories.IRepository<>), typeof(FiyatTakipWebSitesi.Repositories.Repository<>));
-builder.Services.AddSingleton<IEmailService, MockEmailService>();
+// SMTP yapılandırıldıysa gerçek mail gönder, değilse log'a yaz (geliştirici/CI)
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Host"]))
+{
+    builder.Services.AddSingleton<IEmailService, SmtpEmailService>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailService, MockEmailService>();
+}
 
 // ── Uygulama servisleri ───────────────────────────────────────────────────────
 builder.Services.AddScoped<ScraperService>();
@@ -97,6 +105,7 @@ builder.Services.AddScoped<FiyatGecmisiService>();
 builder.Services.AddScoped<KategoriService>();
 builder.Services.AddScoped<KullaniciService>();
 builder.Services.AddScoped<UyariService>();
+builder.Services.AddScoped<OturumDurumu>();
 builder.Services.AddHttpClient<ResimCacheService>();
 builder.Services.AddTransient<FiyatGuncellemeJob>();
 
@@ -134,7 +143,7 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 
 // ── Migration & Seed ──────────────────────────────────────────────────────────
-// Uygulama her başladığında: bekleyen migration'ları uygular, kategorileri
+// Uygulama her başladığında: bekleyen migration'ları uygular, kategorilerix
 // (eğer tablo boşsa) seed eder, sistem katalogunu (eğer boşsa) seed eder.
 // Her iki seed metodu da idempotent — kayıt varsa hiçbir şey yapmaz.
 await using (var scope = app.Services.CreateAsyncScope())

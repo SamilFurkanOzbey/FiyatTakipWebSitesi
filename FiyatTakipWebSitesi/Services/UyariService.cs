@@ -51,9 +51,27 @@ public class UyariService(ApplicationDbContext context, ILogger<UyariService> lo
                 userId, urunId, tip);
         }
 
-        // Mock e-posta gönderimi
-        var userEmail = $"user{userId}@example.com"; // Gerçek projede veritabanından alınır
-        await _emailService.SendEmailAsync(userEmail, baslik, mesaj);
+        // E-posta gönderimi — kullanıcının gerçek e-postasına gönder.
+        // Kullanıcı EmailBildirimleriniAc=false ise atla.
+        var kullanici = await _context.Kullanicilar
+            .Where(k => k.Id == userId)
+            .Select(k => new { k.Email, k.EmailBildirimleriniAc })
+            .FirstOrDefaultAsync();
+
+        if (kullanici is null || string.IsNullOrWhiteSpace(kullanici.Email))
+        {
+            _logger.LogWarning(
+                "[UyariService] Kullanıcı {UserId} için e-posta bulunamadı — mail atlandı.", userId);
+        }
+        else if (!kullanici.EmailBildirimleriniAc)
+        {
+            _logger.LogInformation(
+                "[UyariService] Kullanıcı {UserId} e-posta bildirimlerini kapatmış — mail atlandı.", userId);
+        }
+        else
+        {
+            await _emailService.SendEmailAsync(kullanici.Email, baslik, mesaj);
+        }
 
         return uyari;
     }

@@ -3,6 +3,26 @@
 @inject ScraperService Scraper
 @inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
 @inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
+@inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
+@inject NavigationManager NavManager
+
+@if (!Oturum.GirisYapildi)
+{
+    <div style="padding: 60px 20px; text-align: center; color: white; max-width: 500px; margin: 40px auto; background: #1e293b; border: 1px solid #334155; border-radius: 20px;">
+        <div style="font-size: 4rem; margin-bottom: 12px;">🔐</div>
+        <h2 style="color: #f1f5f9;">Giriş Yapmalısın</h2>
+        <p style="color: #94a3b8; line-height: 1.6;">
+            Ürün takip etmek için önce hesap oluşturup giriş yapmalısın.
+            Sadece üyeler fiyat değişimi takibi yapabilir.
+        </p>
+        <button @onclick='() => NavManager.NavigateTo("/hesap")'
+                style="margin-top: 20px; background: linear-gradient(135deg,#0284c7,#2563eb); color: white; border: none; padding: 14px 28px; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer;">
+            🔑 Giriş Yap / Kayıt Ol
+        </button>
+    </div>
+}
+else
+{
 
 <h2>⭐ Takip Ettiklerim</h2>
 
@@ -179,6 +199,8 @@ else
     }
 </style>
 
+} @* /else (Oturum.GirisYapildi) *@
+
 @code {
 
     // ── Adım modeli ────────────────────────────────────────────
@@ -222,9 +244,18 @@ else
 
     private async Task UrunleriYukle()
     {
-        // SADECE kullanıcının elle eklediği ürünleri çek — sistem kataloğu hariç
-        // (GetAllAsync hem katalog hem kullanıcı ürünlerini dönerdi; bu sayfa için yanlış)
+        // SADECE giriş yapmış kullanıcının kendi ürünlerini çek
+        if (!Oturum.KullaniciId.HasValue)
+        {
+            urunler = new();
+            return;
+        }
+
+        var uid = Oturum.KullaniciId.Value;
         var dbUrunler = await UrunServisi.GetKullaniciTakipleriAsync();
+        // GetKullaniciTakipleriAsync UserId filtresi yapmaz — burada filtreliyoruz
+        dbUrunler = dbUrunler.Where(u => u.UserId == uid).ToList();
+
         urunler = dbUrunler.Select(u => new TakipUrun
         {
             Id = u.Id,
@@ -332,8 +363,9 @@ else
                 SonFiyati = detay.FiyatSayi,
                 ParaBirimi = "TRY",
                 KategoriId = kat?.Id ?? 1,
+                UserId = Oturum.KullaniciId, // Mevcut kullanıcıya bağla — fiyat uyarısı tetiklenir
             };
-            
+
             await UrunServisi.EkleAsync(yeniUrun);
             await UrunleriYukle();
 

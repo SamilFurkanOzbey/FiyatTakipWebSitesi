@@ -1,0 +1,604 @@
+@* =====================================================
+   DemoPaneli.razor
+   Sunum demo'su için: bir ürün seç, kullanıcıya bağla,
+   yeni fiyat gir, uygula. UrunService.FiyatGuncelleAsync
+   tetiklenir → UyariService uyarı oluşturur ve email
+   gönderir. SMTP yapılandırıldıysa gerçek mail gider.
+   ===================================================== *@
+@page "/demo"
+@rendermode InteractiveServer
+@inject FiyatTakipWebSitesi.Data.ApplicationDbContext Db
+@inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
+@inject FiyatTakipWebSitesi.Services.KullaniciService KullaniciServisi
+@using Microsoft.EntityFrameworkCore
+@using FiyatTakipWebSitesi.DTOs
+<PageTitle>Demo Paneli</PageTitle>
+
+<div class="demo-page">
+
+    <header>
+        <h1>🎬 Demo Paneli</h1>
+        <p>Bir ürün seç, yeni fiyat ver, <strong>Uygula</strong>'ya bas. Fiyat güncellenir, uyarı oluşur, SMTP açıksa kullanıcıya mail gider.</p>
+    </header>
+
+    @if (yukleniyor)
+    {
+        <div class="kart"><p>⏳ Yükleniyor...</p></div>
+    }
+    else
+    {
+        @* ── 0) Hızlı Kullanıcı Oluştur ── *@
+        <div class="kart kullanici-kart">
+            <h2>👤 Kullanıcı Hesabı</h2>
+            @if (kullanicilar.Any())
+            {
+                <p class="bilgi-sat">
+                    <strong>@kullanicilar.Count</strong> kayıtlı kullanıcı var:
+                    @string.Join(", ", kullanicilar.Take(3).Select(k => k.Email))
+                    @(kullanicilar.Count > 3 ? "..." : "")
+                </p>
+                <button class="btn-ikinci-kucuk" @onclick="() => yeniKullaniciAcik = !yeniKullaniciAcik">
+                    @(yeniKullaniciAcik ? "✕ Kapat" : "➕ Yeni kullanıcı ekle")
+                </button>
+            }
+            else
+            {
+                <p class="uyari-sat">
+                    ⚠ <strong>Hiçbir kullanıcı kayıtlı değil.</strong> Mail göndermek için en az 1 kullanıcı gerekli.
+                </p>
+            }
+
+            @if (yeniKullaniciAcik)
+            {
+                <div class="hizli-kayit">
+                    <div class="form-satir">
+                        <input type="text" placeholder="Ad" @bind="yeniAd" class="kayit-input" />
+                        <input type="text" placeholder="Soyad" @bind="yeniSoyad" class="kayit-input" />
+                    </div>
+                    <input type="email" placeholder="E-posta (mail buraya gidecek)" @bind="yeniEmail" class="kayit-input tam-gen" />
+                    <input type="password" placeholder="Şifre (en az 6 karakter — sunumda kullanmayacaksın)" @bind="yeniSifre" class="kayit-input tam-gen" />
+                    <button class="btn-ana-kucuk" @onclick="KullaniciOlustur"
+                            disabled="@(kullaniciOlusturuluyor || string.IsNullOrWhiteSpace(yeniAd) || string.IsNullOrWhiteSpace(yeniSoyad) || string.IsNullOrWhiteSpace(yeniEmail) || (yeniSifre?.Length ?? 0) < 6)">
+                        @(kullaniciOlusturuluyor ? "⏳ Oluşturuluyor..." : "✓ Kullanıcıyı Oluştur")
+                    </button>
+                    @if (!string.IsNullOrEmpty(kayitMesaji))
+                    {
+                        <p class="@(kayitBasarili ? "kayit-basarili" : "kayit-hata")">@kayitMesaji</p>
+                    }
+                </div>
+            }
+        </div>
+
+        @* ── 1) Ürün Seç ── *@
+        <div class="kart">
+            <h2>1. Ürünü Seç</h2>
+            <select @bind="secilenUrunId" class="select-buyuk">
+                <option value="0">— Ürün seç —</option>
+                @foreach (var u in urunler)
+                {
+                    var rozet = u.UserId.HasValue ? $"👤 #{u.UserId}" : "⚠ Bağsız";
+                    <option value="@u.Id">[@rozet] @u.Ad — @u.Satici (@u.SonFiyati.ToString("N2", trCulture) ₺)</option>
+                }
+            </select>
+
+            @if (secilenUrun is not null)
+            {
+                <div class="urun-bilgi">
+                    <div class="urun-resim">
+                        @if (!string.IsNullOrEmpty(secilenUrun.Resim))
+                        {
+                            <img src="@secilenUrun.Resim" alt="@secilenUrun.Ad" />
+                        }
+                        else
+                        {
+                            <span class="placeholder">🖼️</span>
+                        }
+                    </div>
+                    <div class="urun-detay">
+                        <h3>@secilenUrun.Ad</h3>
+                        <p><strong>Satıcı:</strong> @secilenUrun.Satici</p>
+                        <p><strong>Mevcut fiyat:</strong> <span class="fiyat-mevcut">@secilenUrun.SonFiyati.ToString("N2", trCulture) ₺</span></p>
+                        @if (secilenUrun.HedefFiyati.HasValue)
+                        {
+                            <p><strong>Hedef fiyat:</strong> @secilenUrun.HedefFiyati.Value.ToString("N2", trCulture) ₺</p>
+                        }
+                        <p>
+                            <strong>Kullanıcı:</strong>
+                            @if (secilenUrun.UserId.HasValue)
+                            {
+                                <span class="rozet-ok">✓ #@secilenUrun.UserId — @(secilenUrun.Kullanici?.Email ?? "(email yok)")</span>
+                            }
+                            else
+                            {
+                                <span class="rozet-uyari">⚠ Bu ürün hiçbir kullanıcıya bağlı değil — uyarı/email gitmez</span>
+                            }
+                        </p>
+                    </div>
+                </div>
+
+                @* Kullanıcıya bağla *@
+                @if (!secilenUrun.UserId.HasValue && kullanicilar.Any())
+                {
+                    <div class="alt-aksiyon">
+                        <label><strong>Hangi kullanıcıya bağlayalım?</strong></label>
+                        <select @bind="atanacakUserId" class="select-buyuk">
+                            <option value="0">— Kullanıcı seç —</option>
+                            @foreach (var k in kullanicilar)
+                            {
+                                <option value="@k.Id">#@k.Id — @k.Email (@k.Ad @k.Soyad)</option>
+                            }
+                        </select>
+                        <button class="btn-ikinci" @onclick="KullaniciyaBagla" disabled="@(atanacakUserId == 0)">
+                            🔗 Bağla
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+
+        @* ── 2) Yeni Fiyat ── *@
+        @if (secilenUrun is not null)
+        {
+            <div class="kart">
+                <h2>2. Yeni Fiyat</h2>
+                <div class="fiyat-input-grup">
+                    <input type="number" step="0.01" min="0"
+                           @bind="yeniFiyat" placeholder="0,00"
+                           class="fiyat-input" />
+                    <span class="para-birimi">₺</span>
+                </div>
+
+                <div class="hizli-butonlar">
+                    <button class="btn-hizli btn-dusur"
+                            @onclick="() => HizliFiyatAyarla(0.90m)"
+                            title="Mevcut fiyatın %10 düşüğü">
+                        ⬇ %10 indir
+                    </button>
+                    <button class="btn-hizli btn-dusur"
+                            @onclick="() => HizliFiyatAyarla(0.75m)"
+                            title="Mevcut fiyatın %25 düşüğü">
+                        ⬇⬇ %25 indir
+                    </button>
+                    @if (secilenUrun.HedefFiyati.HasValue)
+                    {
+                        <button class="btn-hizli btn-hedef"
+                                @onclick="() => yeniFiyat = secilenUrun.HedefFiyati!.Value">
+                            🎯 Hedef fiyata in (@secilenUrun.HedefFiyati.Value.ToString("N0", trCulture) ₺)
+                        </button>
+                    }
+                    <button class="btn-hizli btn-artir"
+                            @onclick="() => HizliFiyatAyarla(1.10m)"
+                            title="Mevcut fiyatın %10 fazlası">
+                        ⬆ %10 artır
+                    </button>
+                </div>
+
+                <button class="btn-ana" @onclick="Uygula"
+                        disabled="@(islemDevam || yeniFiyat <= 0)">
+                    @if (islemDevam)
+                    {
+                        <span>⏳ Uygulanıyor...</span>
+                    }
+                    else
+                    {
+                        <span>🚀 Uygula (uyarı + email tetiklensin)</span>
+                    }
+                </button>
+            </div>
+        }
+
+        @* ── 3) Sonuç ── *@
+        @if (sonSonuc is not null)
+        {
+            <div class="kart sonuc @(sonSonuc.Basarili ? "basarili" : "hatali")">
+                <h2>@(sonSonuc.Basarili ? "✅ Sonuç" : "❌ Sonuç")</h2>
+                <ul class="sonuc-liste">
+                    <li><strong>Eski fiyat:</strong> @sonSonuc.EskiFiyat.ToString("N2", trCulture) ₺</li>
+                    <li><strong>Yeni fiyat:</strong> @sonSonuc.YeniFiyat.ToString("N2", trCulture) ₺</li>
+                    <li><strong>Değişim:</strong>
+                        <span class="@(sonSonuc.Degisim < 0 ? "yesil" : sonSonuc.Degisim > 0 ? "kirmizi" : "")">
+                            @(sonSonuc.Degisim > 0 ? "+" : "")@sonSonuc.Degisim.ToString("N2", trCulture) ₺
+                            (@(sonSonuc.DegisimYuzdesi > 0 ? "+" : "")@sonSonuc.DegisimYuzdesi.ToString("N1", trCulture)%)
+                        </span>
+                    </li>
+                    <li><strong>Uyarı oluştu mu?</strong>
+                        @(sonSonuc.UyariOlustu ? $"✓ Evet ({sonSonuc.UyariCount} adet — {string.Join(", ", sonSonuc.UyariTipleri)})" : "Hayır")
+                    </li>
+                    <li><strong>Email akışı:</strong>
+                        @if (!sonSonuc.UyariOlustu)
+                        {
+                            <span>Uyarı tetiklenmedi — email gönderilmedi</span>
+                        }
+                        else if (string.IsNullOrEmpty(sonSonuc.KullaniciEmail))
+                        {
+                            <span>⚠ Kullanıcı email'i yok</span>
+                        }
+                        else
+                        {
+                            <span>✉ @sonSonuc.KullaniciEmail adresine gönderildi (loga bak: <code>[SmtpEmailService] ✓</code>)</span>
+                        }
+                    </li>
+                </ul>
+                <p class="ipucu">💡 Aynı ürünü tekrar farklı fiyatla deneyebilirsin — uyarı kuralları dinamik.</p>
+            </div>
+        }
+    }
+
+</div>
+
+<style>
+    body { background: #0f172a; }
+    .demo-page { padding: 28px 36px; max-width: 1000px; margin: 0 auto; color: white; }
+    header { margin-bottom: 24px; }
+    header h1 { font-size: 2rem; margin: 0 0 8px; color: #f1f5f9; }
+    header p { color: #94a3b8; margin: 0; line-height: 1.6; }
+
+    .kart {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 22px 26px;
+        margin-bottom: 18px;
+    }
+    .kart h2 {
+        font-size: 1.15rem;
+        margin: 0 0 14px;
+        color: #f1f5f9;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #334155;
+    }
+    .select-buyuk {
+        width: 100%;
+        background: #0f172a;
+        color: white;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 0.95rem;
+        margin-bottom: 12px;
+    }
+    .select-buyuk:focus { outline: none; border-color: #38bdf8; }
+
+    .urun-bilgi {
+        display: flex;
+        gap: 18px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #334155;
+    }
+    .urun-resim {
+        width: 110px; height: 110px;
+        background: white; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; overflow: hidden;
+    }
+    .urun-resim img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+    .placeholder { font-size: 2.5rem; opacity: 0.4; }
+    .urun-detay { flex: 1; }
+    .urun-detay h3 { margin: 0 0 8px; color: #f1f5f9; font-size: 1.05rem; }
+    .urun-detay p { margin: 4px 0; color: #cbd5e1; font-size: 0.92rem; }
+    .fiyat-mevcut { color: #38bdf8; font-weight: 700; font-size: 1.1rem; }
+    .rozet-ok { color: #4ade80; font-weight: 600; }
+    .rozet-uyari { color: #fbbf24; font-weight: 600; }
+
+    .alt-aksiyon {
+        margin-top: 16px; padding-top: 14px;
+        border-top: 1px dashed #475569;
+        display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    .alt-aksiyon label { color: #cbd5e1; }
+
+    .fiyat-input-grup {
+        display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    }
+    .fiyat-input {
+        flex: 1; background: #0f172a; color: #38bdf8;
+        border: 2px solid #475569; border-radius: 10px;
+        padding: 14px 18px; font-size: 1.5rem; font-weight: 700;
+    }
+    .fiyat-input:focus { outline: none; border-color: #38bdf8; }
+    .para-birimi { font-size: 1.5rem; color: #94a3b8; font-weight: 700; }
+
+    .hizli-butonlar {
+        display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .btn-hizli {
+        background: #334155; color: white; border: 1px solid #475569;
+        padding: 8px 14px; border-radius: 8px; cursor: pointer;
+        font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+    }
+    .btn-hizli:hover { background: #475569; }
+    .btn-dusur { color: #4ade80; }
+    .btn-artir { color: #f87171; }
+    .btn-hedef { color: #fbbf24; }
+
+    .btn-ana {
+        width: 100%; background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: white; border: none; padding: 16px;
+        border-radius: 12px; font-size: 1rem; font-weight: 700;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-ana:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(2, 132, 199, 0.4);
+    }
+    .btn-ana:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-ikinci {
+        background: #0284c7; color: white; border: none;
+        padding: 10px 16px; border-radius: 8px; cursor: pointer;
+        font-weight: 600;
+    }
+    .btn-ikinci:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ikinci:hover:not(:disabled) { background: #0369a1; }
+
+    .sonuc { border-width: 2px; }
+    .sonuc.basarili { border-color: #4ade80; }
+    .sonuc.hatali { border-color: #f87171; }
+    .sonuc-liste { list-style: none; padding: 0; margin: 0; }
+    .sonuc-liste li {
+        padding: 8px 0; border-bottom: 1px solid #334155;
+        color: #cbd5e1; line-height: 1.6;
+    }
+    .sonuc-liste li:last-child { border-bottom: none; }
+    .yesil { color: #4ade80; font-weight: 700; }
+    .kirmizi { color: #f87171; font-weight: 700; }
+    .ipucu {
+        margin-top: 14px; padding: 10px 14px;
+        background: #0f172a; border-left: 3px solid #38bdf8;
+        color: #94a3b8; font-size: 0.88rem; border-radius: 6px;
+    }
+
+    /* ── Kullanıcı kartı ── */
+    .kullanici-kart { border-color: #475569; }
+    .bilgi-sat { color: #cbd5e1; margin: 8px 0 12px; font-size: 0.92rem; }
+    .uyari-sat {
+        color: #fbbf24; background: #422006;
+        padding: 12px 16px; border-radius: 8px;
+        border-left: 4px solid #f59e0b;
+        margin: 0 0 14px;
+    }
+    .hizli-kayit {
+        margin-top: 14px; padding-top: 14px;
+        border-top: 1px dashed #475569;
+        display: flex; flex-direction: column; gap: 10px;
+    }
+    .form-satir { display: flex; gap: 10px; }
+    .kayit-input {
+        flex: 1; background: #0f172a; color: white;
+        border: 1px solid #475569; border-radius: 8px;
+        padding: 10px 14px; font-size: 0.92rem;
+    }
+    .kayit-input:focus { outline: none; border-color: #38bdf8; }
+    .kayit-input.tam-gen { width: 100%; }
+    .btn-ana-kucuk {
+        background: linear-gradient(135deg, #16a34a, #15803d);
+        color: white; border: none;
+        padding: 12px 18px; border-radius: 8px;
+        font-weight: 700; cursor: pointer; transition: all 0.2s;
+        align-self: flex-start;
+    }
+    .btn-ana-kucuk:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 14px rgba(22, 163, 74, 0.35);
+    }
+    .btn-ana-kucuk:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ikinci-kucuk {
+        background: #334155; color: #cbd5e1; border: 1px solid #475569;
+        padding: 8px 14px; border-radius: 8px; cursor: pointer;
+        font-size: 0.88rem; font-weight: 600;
+    }
+    .btn-ikinci-kucuk:hover { background: #475569; color: white; }
+    .kayit-basarili {
+        color: #4ade80; background: #052e16;
+        padding: 10px 14px; border-radius: 6px;
+        margin: 0; border-left: 3px solid #16a34a;
+    }
+    .kayit-hata {
+        color: #fca5a5; background: #450a0a;
+        padding: 10px 14px; border-radius: 6px;
+        margin: 0; border-left: 3px solid #dc2626;
+    }
+    code {
+        background: #0f172a; color: #38bdf8;
+        padding: 2px 6px; border-radius: 4px;
+        font-size: 0.85em;
+    }
+</style>
+
+@code {
+    List<FiyatTakipWebSitesi.Models.Urun> urunler = new();
+    List<FiyatTakipWebSitesi.Models.Kullanici> kullanicilar = new();
+    int secilenUrunId = 0;
+    int atanacakUserId = 0;
+    decimal yeniFiyat = 0;
+    bool yukleniyor = true;
+    bool islemDevam = false;
+    SonucBilgisi? sonSonuc;
+
+    // Hızlı kullanıcı oluşturma
+    bool yeniKullaniciAcik = false;
+    bool kullaniciOlusturuluyor = false;
+    string yeniAd = "";
+    string yeniSoyad = "";
+    string yeniEmail = "";
+    string yeniSifre = "";
+    string kayitMesaji = "";
+    bool kayitBasarili = false;
+
+    static readonly System.Globalization.CultureInfo trCulture =
+        new System.Globalization.CultureInfo("tr-TR");
+
+    FiyatTakipWebSitesi.Models.Urun? secilenUrun =>
+        urunler.FirstOrDefault(u => u.Id == secilenUrunId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await VerileriYukle();
+    }
+
+    async Task VerileriYukle()
+    {
+        yukleniyor = true;
+        StateHasChanged();
+
+        urunler = await Db.Urunler
+            .Include(u => u.Kullanici)
+            .Where(u => u.Aktif)
+            .OrderByDescending(u => u.UserId.HasValue) // önce kullanıcıya bağlı olanlar
+            .ThenBy(u => u.Ad)
+            .Take(100)
+            .ToListAsync();
+
+        kullanicilar = await Db.Kullanicilar
+            .Where(k => k.Aktif)
+            .OrderBy(k => k.Email)
+            .ToListAsync();
+
+        // Hiç kullanıcı yoksa formu otomatik aç
+        if (kullanicilar.Count == 0)
+            yeniKullaniciAcik = true;
+
+        yukleniyor = false;
+        StateHasChanged();
+    }
+
+    void HizliFiyatAyarla(decimal carpan)
+    {
+        if (secilenUrun is null) return;
+        var temel = secilenUrun.SonFiyati > 0 ? secilenUrun.SonFiyati : (secilenUrun.BaslangicFiyati > 0 ? secilenUrun.BaslangicFiyati : 1000m);
+        yeniFiyat = Math.Round(temel * carpan, 2);
+    }
+
+    async Task KullaniciOlustur()
+    {
+        if (string.IsNullOrWhiteSpace(yeniAd) || string.IsNullOrWhiteSpace(yeniSoyad)
+            || string.IsNullOrWhiteSpace(yeniEmail) || (yeniSifre?.Length ?? 0) < 6) return;
+
+        kullaniciOlusturuluyor = true;
+        kayitMesaji = "";
+        StateHasChanged();
+
+        try
+        {
+            var istek = new KayitRequest
+            {
+                Ad = yeniAd.Trim(),
+                Soyad = yeniSoyad.Trim(),
+                Email = yeniEmail.Trim(),
+                Sifre = yeniSifre!
+            };
+            var yanit = await KullaniciServisi.KayitAsync(istek);
+
+            kayitBasarili = true;
+            kayitMesaji = $"✓ Kullanıcı oluşturuldu: {yanit.Email} (ID: {yanit.KullaniciId})";
+
+            // Formu temizle (şifre alanı güvenlik için)
+            yeniAd = ""; yeniSoyad = ""; yeniEmail = ""; yeniSifre = "";
+            yeniKullaniciAcik = false;
+
+            await VerileriYukle();
+
+            // Eğer bir ürün zaten seçiliyse ve UserId yoksa, yeni kullanıcıyı seçilecek olarak işaretle
+            if (secilenUrun is not null && !secilenUrun.UserId.HasValue)
+                atanacakUserId = yanit.KullaniciId;
+        }
+        catch (InvalidOperationException ex)
+        {
+            kayitBasarili = false;
+            kayitMesaji = $"✗ {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            kayitBasarili = false;
+            kayitMesaji = $"✗ Beklenmeyen hata: {ex.Message}";
+        }
+        finally
+        {
+            kullaniciOlusturuluyor = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task KullaniciyaBagla()
+    {
+        if (secilenUrun is null || atanacakUserId == 0) return;
+
+        var urun = await Db.Urunler.FirstOrDefaultAsync(u => u.Id == secilenUrun.Id);
+        if (urun is null) return;
+
+        urun.UserId = atanacakUserId;
+        await Db.SaveChangesAsync();
+
+        await VerileriYukle();
+        secilenUrunId = urun.Id; // seçimi koru
+        atanacakUserId = 0;
+    }
+
+    async Task Uygula()
+    {
+        if (secilenUrun is null || yeniFiyat <= 0) return;
+
+        islemDevam = true;
+        sonSonuc = null;
+        StateHasChanged();
+
+        var eskiFiyat = secilenUrun.SonFiyati;
+        var urunId = secilenUrun.Id;
+        var userEmail = secilenUrun.Kullanici?.Email;
+        var userId = secilenUrun.UserId;
+
+        // Önce mevcut uyarı sayısını öğren (Uygula sonrası farkı bulmak için)
+        var oncekiUyariCount = userId.HasValue
+            ? await Db.Uyarilar.CountAsync(u => u.UrunId == urunId && u.UserId == userId.Value)
+            : 0;
+
+        var basarili = await UrunServisi.FiyatGuncelleAsync(urunId, yeniFiyat, stokVar: true);
+
+        // Yeni uyarıları çek
+        var yeniUyarilar = new List<string>();
+        if (userId.HasValue)
+        {
+            yeniUyarilar = await Db.Uyarilar
+                .Where(u => u.UrunId == urunId && u.UserId == userId.Value)
+                .OrderByDescending(u => u.OlusturulmaTarihi)
+                .Take(Math.Max(1, (await Db.Uyarilar.CountAsync(u => u.UrunId == urunId && u.UserId == userId.Value)) - oncekiUyariCount))
+                .Select(u => u.Tip.ToString())
+                .ToListAsync();
+        }
+
+        var degisim = yeniFiyat - eskiFiyat;
+        var degisimYuzdesi = eskiFiyat != 0 ? Math.Round((degisim / eskiFiyat) * 100, 1) : 0;
+
+        sonSonuc = new SonucBilgisi
+        {
+            Basarili = basarili,
+            EskiFiyat = eskiFiyat,
+            YeniFiyat = yeniFiyat,
+            Degisim = degisim,
+            DegisimYuzdesi = degisimYuzdesi,
+            UyariOlustu = yeniUyarilar.Count > 0,
+            UyariCount = yeniUyarilar.Count,
+            UyariTipleri = yeniUyarilar,
+            KullaniciEmail = userEmail
+        };
+
+        await VerileriYukle();
+        secilenUrunId = urunId; // seçimi koru
+        islemDevam = false;
+        StateHasChanged();
+    }
+
+    class SonucBilgisi
+    {
+        public bool Basarili { get; set; }
+        public decimal EskiFiyat { get; set; }
+        public decimal YeniFiyat { get; set; }
+        public decimal Degisim { get; set; }
+        public decimal DegisimYuzdesi { get; set; }
+        public bool UyariOlustu { get; set; }
+        public int UyariCount { get; set; }
+        public List<string> UyariTipleri { get; set; } = new();
+        public string? KullaniciEmail { get; set; }
+    }
+}
