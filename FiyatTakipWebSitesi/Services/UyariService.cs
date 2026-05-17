@@ -12,11 +12,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FiyatTakipWebSitesi.Services;
 
-public class UyariService(ApplicationDbContext context, ILogger<UyariService> logger, IEmailService emailService)
+public class UyariService(
+    ApplicationDbContext context,
+    ILogger<UyariService> logger,
+    IEmailService emailService,
+    TakipModeliService takipModeliService)
 {
     private readonly ApplicationDbContext _context = context;
     private readonly ILogger<UyariService> _logger = logger;
     private readonly IEmailService _emailService = emailService;
+    private readonly TakipModeliService _takipModeliService = takipModeliService;
 
     // ── Uyarı Oluşturma ──────────────────────────────────────
 
@@ -145,6 +150,66 @@ public class UyariService(ApplicationDbContext context, ILogger<UyariService> lo
                     urun.Id, userId, UyariTipi.RekorDusuk,
                     baslik: $"Rekor Düşük Fiyat! 🏆 — {urun.Ad}",
                     mesaj:  $"Ürün takip edildiğinden bu yana en düşük fiyatına ulaştı: {yeniFiyat:N2} ₺");
+        }
+    }
+
+    // ── Hibrit Sistem — Model bazlı en ucuz fiyat uyarısı ────
+
+    /// <summary>
+    /// Bir modelin herhangi bir listingi güncellendiğinde çağrılır. TakipModeliService'den
+    /// "en ucuz değişti mi?" sonucunu alır ve etkilenen TÜM takipçilere mail/uyarı atar.
+    /// Spam engelleme: TakipModeli'nin SonBildirilenEnUcuz değeri güncellenir, aynı seviye
+    /// için bir daha mail atılmaz.
+    /// </summary>
+    public async Task ModelEnUcuzFiyatUyariKontrolAsync(int modelId)
+    {
+        var uyarilar = await _takipModeliService.FiyatDegisimiKontrolEtAsync(modelId);
+
+        foreach (var u in uyarilar)
+        {
+            var degisim = u.YeniEnUcuz - u.EskiEnUcuz;
+            var yuzde = u.EskiEnUcuz > 0
+                ? Math.Round(Math.Abs(degisim / u.EskiEnUcuz * 100), 1)
+                : 0;
+
+            UyariTipi tip;
+            string baslik;
+            string mesaj;
+
+            if (u.HedefBasti)
+            {
+                tip = UyariTipi.HedefFiyataBasti;
+                baslik = $"🎯 Hedef Fiyata Ulaşıldı — {u.ModelAd}";
+                mesaj = $"Hedef fiyatınız olan {u.HedefFiyat:N2} ₺'nin altına düştü!\n" +
+                        $"Yeni en ucuz: {u.YeniEnUcuz:N2} ₺ ({u.EnUcuzSatici})\n" +
+                        $"Önceki en ucuz: {u.EskiEnUcuz:N2} ₺";
+            }
+            else if (degisim < 0)
+            {
+                tip = UyariTipi.FiyatDususu;
+                baslik = $"📉 Fiyat Düştü! — {u.ModelAd}";
+                mesaj = $"En ucuz fiyat %{yuzde} düşerek {u.YeniEnUcuz:N2} ₺ oldu ({u.EnUcuzSatici}).\n" +
+                        $"Önceki en ucuz: {u.EskiEnUcuz:N2} ₺";
+            }
+            else
+            {
+                tip = UyariTipi.FiyatArtisi;
+                baslik = $"📈 Fiyat Arttı — {u.ModelAd}";
+                mesaj = $"En ucuz fiyat %{yuzde} artarak {u.YeniEnUcuz:N2} ₺ oldu ({u.EnUcuzSatici}).\n" +
+                        $"Önceki en ucuz: {u.EskiEnUcuz:N2} ₺";
+            }
+
+            // Hangi Urun id'si üzerinden Uyari kaydı oluşturulacak? Modele bağlı en ucuz listingi.
+            var enUcuzUrun = await _context.Urunler
+                .AsNoTracking()
+                .Where(x => x.UrunModeliId == u.ModelId && x.Aktif && x.SonFiyati > 0)
+                .OrderBy(x => x.SonFiyati)
+                .Select(x => new { x.Id })
+                .FirstOrDefaultAsync();
+
+            if (enUcuzUrun is null) continue;
+
+            await OlusturAsync(enUcuzUrun.Id, u.UserId, tip, baslik, mesaj);
         }
     }
 

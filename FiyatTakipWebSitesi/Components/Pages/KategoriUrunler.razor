@@ -2,38 +2,16 @@
 @rendermode InteractiveServer
 @inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
 @inject FiyatTakipWebSitesi.Services.KategoriService KategoriServisi
+@inject FiyatTakipWebSitesi.Services.TakipModeliService TakipModeliServisi
 @inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
 @inject FiyatTakipWebSitesi.Data.ApplicationDbContext Db
 @inject NavigationManager NavManager
 @using Microsoft.EntityFrameworkCore
+@implements IDisposable
 
-<PageTitle>Kategoriler | Fiyat Takip</PageTitle>
+<PageTitle>Kategoriler | ŞAM</PageTitle>
 
 <div class="kategori-page">
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <i class="bi bi-grid-fill"></i> KATEGORİLER
-        </div>
-
-        @if (Oturum.GirisYapildi)
-        {
-            <div class="kategori-item @(secilenMod == "favori" ? "active" : "")"
-                 @onclick='() => FavorileriYukleAsync()'>
-                ⭐ Favori Ürünler
-            </div>
-
-            <hr style="border-color: #334155; margin: 10px 0;" />
-        }
-
-        @foreach (var kat in dbKategoriler)
-        {
-            <div class="kategori-item @(secilenKategoriId == kat.Id && secilenMod == "kategori" ? "active" : "")"
-                 @onclick="() => KategoriSec(kat)">
-                @(string.IsNullOrEmpty(kat.Icon) ? "📦" : kat.Icon) @kat.Ad
-            </div>
-        }
-    </div>
-
     <div class="content">
         <div class="content-header">
             <h2>@baslik</h2>
@@ -73,6 +51,38 @@
                             {
                                 <p class="alt-bilgi">@urun.AltBilgi</p>
                             }
+
+                            @* Takip Et / Takipten Çık toggle *@
+                            @if (urun.ModelId > 0)
+                            {
+                                @if (urun.TakipEdiliyor)
+                                {
+                                    <button class="takip-btn takip-edildi"
+                                            @onclick="() => TakiptenCik(urun)"
+                                            @onclick:stopPropagation="true"
+                                            disabled="@urun.IslemDevam">
+                                        @if (urun.IslemDevam)
+                                        {
+                                            <span>⏳ Kaldırılıyor...</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="durum-varsayilan">✓ Takip Ediliyor</span>
+                                            <span class="durum-hover">✕ Takipten Çık</span>
+                                        }
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="takip-btn"
+                                            @onclick="() => TakipEt(urun)"
+                                            @onclick:stopPropagation="true"
+                                            disabled="@urun.IslemDevam">
+                                        @(urun.IslemDevam ? "⏳ Ekleniyor..." : "📌 Takip Et")
+                                    </button>
+                                }
+                            }
+
                             <div class="btn-row">
                                 <NavLink href="@urun.DetayLink" class="detay-btn" @onclick:stopPropagation="true">Detay</NavLink>
                                 <NavLink href="@urun.GrafikLink" class="grafik-btn" @onclick:stopPropagation="true">Grafik</NavLink>
@@ -80,21 +90,6 @@
                         </div>
                     </div>
                 }
-            </div>
-        }
-        else if (string.IsNullOrEmpty(secilenMod))
-        {
-            <div class="bos-durum">
-                <span style="font-size: 50px;">👈</span>
-                <p>Ürünleri görmek için bir kategori seçin</p>
-            </div>
-        }
-        else if (secilenMod == "favori")
-        {
-            <div class="bos-durum">
-                <span style="font-size: 50px;">⭐</span>
-                <p>Henüz takip ettiğin ürün yok.</p>
-                <p style="font-size:14px; opacity:0.7;">Takip Ettiklerim sayfasından ürün ekleyebilirsin.</p>
             </div>
         }
         else
@@ -108,25 +103,14 @@
 </div>
 
 <style>
-    .kategori-page { display: flex; min-height: 100vh; background: #0f172a; color: white; }
-
-    /* SIDEBAR STİLLERİ */
-    .sidebar { width: 280px; background: #111827; padding: 15px; border-right: 1px solid #1e293b; }
-    .sidebar-header { font-size: 12px; color: #94a3b8; letter-spacing: 1px; margin-bottom: 20px; padding-left: 10px; }
-
-    .kategori-item {
-        padding: 12px 15px; border-radius: 8px; margin-bottom: 5px;
-        cursor: pointer; transition: 0.3s; color: #cbd5e1; font-size: 15px;
-    }
-    .kategori-item:hover { background: #1e293b; color: white; }
-    .kategori-item.active { background: #1e293b; color: #38bdf8; border-left: 4px solid #38bdf8; }
+    .kategori-page { min-height: 100vh; background: #0f172a; color: white; }
 
     /* İÇERİK ALANI STİLLERİ */
-    .content { flex: 1; padding: 40px; }
+    .content { padding: 28px 32px; width: 100%; }
     .content-header { margin-bottom: 30px; border-bottom: 1px solid #1e293b; padding-bottom: 15px; display:flex; align-items:center; gap:14px; }
     .adet-rozet { background:#1e293b; color:#94a3b8; padding:4px 12px; border-radius:999px; font-size:0.85rem; border:1px solid #334155; }
 
-    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; }
 
     .urun-card { background: #1e293b; border-radius: 12px; overflow: hidden; border: 1px solid #334155; transition: 0.3s; cursor:pointer; }
     .urun-card:hover { transform: translateY(-5px); border-color: #38bdf8; }
@@ -139,7 +123,42 @@
     .fiyat { color: #38bdf8; font-weight: bold; font-size: 1.1rem; margin:0 0 4px; }
     .alt-bilgi { color:#94a3b8; font-size:0.8rem; margin:0 0 8px; }
 
-    .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    .takip-btn {
+        width: 100%;
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 4px;
+    }
+    .takip-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    }
+    .takip-btn:disabled { cursor: not-allowed; opacity: 0.85; }
+    .takip-btn.takip-edildi {
+        background: #052e16;
+        color: #4ade80;
+        border: 1px solid #16a34a;
+    }
+    .takip-btn.takip-edildi:hover:not(:disabled) {
+        background: #7f1d1d;
+        color: #fca5a5;
+        border-color: #dc2626;
+        transform: none;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+    }
+    /* Hover'da yazı değişimi — JS gerektirmeden CSS ile */
+    .takip-btn.takip-edildi .durum-hover { display: none; }
+    .takip-btn.takip-edildi:hover:not(:disabled) .durum-varsayilan { display: none; }
+    .takip-btn.takip-edildi:hover:not(:disabled) .durum-hover { display: inline; }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; }
     .detay-btn { background: #334155; flex:1; text-align:center; padding:8px; border-radius:6px; text-decoration:none; color:white; font-size:12px; transition: filter 0.2s; }
     .grafik-btn { background: #0284c7; flex:1; text-align:center; padding:8px; border-radius:8px; text-decoration:none; color:white; font-size:12px; transition: filter 0.2s; }
     .detay-btn:hover, .grafik-btn:hover { filter: brightness(1.2); color: white; }
@@ -156,7 +175,6 @@
     List<FiyatTakipWebSitesi.Models.Kategori> dbKategoriler = new();
 
     // Seçim durumu
-    string secilenMod = ""; // "kategori" | "favori" | ""
     int secilenKategoriId = 0;
     string baslik = "Hoş Geldiniz";
     bool yukleniyor = false;
@@ -167,11 +185,46 @@
     protected override async Task OnInitializedAsync()
     {
         dbKategoriler = await KategoriServisi.GetAllAsync();
+        NavManager.LocationChanged += OnLocationChanged;
+        await UrlYansit();
+    }
+
+    public void Dispose()
+    {
+        NavManager.LocationChanged -= OnLocationChanged;
+    }
+
+    void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await UrlYansit();
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>URL query parametrelerine göre kategori seçimini uygular.</summary>
+    async Task UrlYansit()
+    {
+        if (dbKategoriler.Count == 0) return;
+
+        var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        // ?kategori=ID → o kategoriyi göster
+        FiyatTakipWebSitesi.Models.Kategori? hedef = null;
+        if (query.TryGetValue("kategori", out var idStr) &&
+            int.TryParse(idStr, out var kategoriId))
+        {
+            hedef = dbKategoriler.FirstOrDefault(k => k.Id == kategoriId);
+        }
+
+        // Hedef yoksa ilk kategoriyi seç (boş ekran karşılamasın)
+        await KategoriSec(hedef ?? dbKategoriler.First());
     }
 
     async Task KategoriSec(FiyatTakipWebSitesi.Models.Kategori kategori)
     {
-        secilenMod = "kategori";
         secilenKategoriId = kategori.Id;
         baslik = $"{(string.IsNullOrEmpty(kategori.Icon) ? "📦" : kategori.Icon)} {kategori.Ad}";
         yukleniyor = true;
@@ -180,11 +233,20 @@
 
         var modeller = await UrunServisi.GetModellerByKategoriAsync(kategori.Id);
 
+        // Kullanıcının takip ettiği ModelId'leri çek (hibrit sistem)
+        HashSet<int> takipModelIdleri = new();
+        if (Oturum.GirisYapildi)
+        {
+            takipModelIdleri = await TakipModeliServisi
+                .KullaniciTakipModelIdleriAsync(Oturum.KullaniciId!.Value);
+        }
+
         modelKartlar = modeller.Select(m =>
         {
             var aktifListeler = m.Listeler.Where(l => l.Aktif && l.SonFiyati > 0).ToList();
             decimal? enDusuk = aktifListeler.Any() ? aktifListeler.Min(l => l.SonFiyati) : (decimal?)null;
             var saticiCount = m.Listeler.Count(l => l.Aktif);
+            var modelUrls = m.Listeler.Select(l => l.URL).ToList();
 
             // Resim: önce modelin kendi resmi, yoksa ilk dolu listeleme resmi
             var resim = !string.IsNullOrEmpty(m.Resim)
@@ -193,6 +255,9 @@
 
             return new UrunKart
             {
+                ModelId = m.Id,
+                ModelUrlleri = modelUrls,
+                TakipEdiliyor = takipModelIdleri.Contains(m.Id),
                 Ad = m.Ad,
                 Resim = resim,
                 Fiyat = enDusuk.HasValue ? $"{enDusuk.Value.ToString("N2", trCulture)} ₺" : "Fiyat bekleniyor",
@@ -208,48 +273,70 @@
         StateHasChanged();
     }
 
-    async Task FavorileriYukleAsync()
-    {
-        if (!Oturum.GirisYapildi) return;
-
-        secilenMod = "favori";
-        secilenKategoriId = 0;
-        baslik = "⭐ Favori Ürünler";
-        yukleniyor = true;
-        modelKartlar = new();
-        StateHasChanged();
-
-        var uid = Oturum.KullaniciId!.Value;
-        var takipler = await Db.Urunler
-            .AsNoTracking()
-            .Include(u => u.Kategori)
-            .Where(u => u.UserId == uid && u.Aktif)
-            .OrderByDescending(u => u.EklendigiTarih)
-            .ToListAsync();
-
-        modelKartlar = takipler.Select(u => new UrunKart
-        {
-            Ad = u.Ad,
-            Resim = u.Resim ?? "",
-            Fiyat = u.SonFiyati > 0
-                ? $"{u.SonFiyati.ToString("N2", trCulture)} ₺"
-                : "Fiyat bekleniyor",
-            AltBilgi = string.IsNullOrEmpty(u.Satici) ? (u.Kategori?.Ad ?? "") : $"🏪 {u.Satici}",
-            DetayLink = $"/urundetay/{u.Id}",
-            GrafikLink = $"/grafik/{u.Id}"
-        }).ToList();
-
-        yukleniyor = false;
-        StateHasChanged();
-    }
-
     void Detaya(UrunKart kart)
     {
         NavManager.NavigateTo(kart.DetayLink);
     }
 
+    /// <summary>
+    /// Bir model kartının "📌 Takip Et" butonuna basılınca: modelin en ucuz
+    /// (aktif + fiyatlı) listelemesini bulup kullanıcının takip listesine
+    /// kopyalar. Yoksa rastgele bir aktif listingi kullanır. Sonuçta kullanıcının
+    /// /takip sayfasında görünür ve fiyat değişimlerinde mail alır.
+    /// </summary>
+    /// <summary>
+    /// Hibrit sistem: kullanıcıyı bu modele takipçi yapar. TakipModeli tablosuna
+    /// kayıt ekler, modelin tüm site fiyatları izlenmeye başlar.
+    /// </summary>
+    async Task TakipEt(UrunKart kart)
+    {
+        if (!Oturum.GirisYapildi)
+        {
+            NavManager.NavigateTo("/hesap");
+            return;
+        }
+
+        kart.IslemDevam = true;
+        StateHasChanged();
+
+        try
+        {
+            await TakipModeliServisi.TakipEkleAsync(Oturum.KullaniciId!.Value, kart.ModelId);
+            kart.TakipEdiliyor = true;
+        }
+        finally
+        {
+            kart.IslemDevam = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Modeli takip listesinden çıkarır (soft delete).</summary>
+    async Task TakiptenCik(UrunKart kart)
+    {
+        if (!Oturum.GirisYapildi) return;
+
+        kart.IslemDevam = true;
+        StateHasChanged();
+
+        try
+        {
+            await TakipModeliServisi.TakiptenCikAsync(Oturum.KullaniciId!.Value, kart.ModelId);
+            kart.TakipEdiliyor = false;
+        }
+        finally
+        {
+            kart.IslemDevam = false;
+            StateHasChanged();
+        }
+    }
+
     class UrunKart
     {
+        public int ModelId { get; set; }                           // Hangi UrunModeli — Takip Et için
+        public List<string> ModelUrlleri { get; set; } = new();    // Bu modelin tüm listing URL'leri
+        public bool TakipEdiliyor { get; set; }                    // Kullanıcı zaten takipte mi
+        public bool IslemDevam { get; set; }                       // Buton "Ekleniyor..." durumu
         public string Ad { get; set; } = "";
         public string Resim { get; set; } = "";
         public string Fiyat { get; set; } = "";

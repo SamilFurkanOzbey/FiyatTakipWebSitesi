@@ -23,7 +23,7 @@ builder.Services.AddOpenApi(options =>
     // JWT Bearer Auth için OpenAPI Ayarı
     options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-        document.Info.Title = "Fiyat Takip API";
+        document.Info.Title = "ŞAM API";
         document.Info.Version = "v1";
         return Task.CompletedTask;
     });
@@ -99,6 +99,7 @@ builder.Services.AddScoped<KategoriService>();
 builder.Services.AddScoped<KullaniciService>();
 builder.Services.AddScoped<UyariService>();
 builder.Services.AddScoped<OturumDurumu>();
+builder.Services.AddScoped<TakipModeliService>();
 builder.Services.AddHttpClient<ResimCacheService>();
 builder.Services.AddTransient<FiyatGuncellemeJob>();
 
@@ -169,7 +170,7 @@ else
     app.MapOpenApi();
     app.MapScalarApiReference(options =>
     {
-        options.WithTitle("Fiyat Takip API Reference");
+        options.WithTitle("ŞAM API Reference");
         options.WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient);
         // Scalar JWT Bearer Authentication Setup
         options.AddServer(new Scalar.AspNetCore.ScalarServer("https://localhost:7164", "Local server"));

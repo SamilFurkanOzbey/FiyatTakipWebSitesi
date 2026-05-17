@@ -192,8 +192,19 @@ public class UrunService(
         // Uyarı kontrolü (sadece fiyat değiştiyse)
         if (degisim != 0)
         {
-            var isRekorDusuk = await _fiyatGecmisiService.IsRekorDusukAsync(urunId, yeniFiyat);
-            await _uyariService.FiyatDegisimUyariKontrolAsync(urun, eskiFiyat, yeniFiyat, isRekorDusuk);
+            // Mevcut kullanıcı-bağlı (UserId set) ürünler için per-listing uyarı
+            if (urun.UserId.HasValue)
+            {
+                var isRekorDusuk = await _fiyatGecmisiService.IsRekorDusukAsync(urunId, yeniFiyat);
+                await _uyariService.FiyatDegisimUyariKontrolAsync(urun, eskiFiyat, yeniFiyat, isRekorDusuk);
+            }
+
+            // Hibrit sistem: bu ürün bir modelin listingi mi? Modelin tüm takipçilerine
+            // "en ucuz değişti mi?" kontrolü
+            if (urun.UrunModeliId.HasValue)
+            {
+                await _uyariService.ModelEnUcuzFiyatUyariKontrolAsync(urun.UrunModeliId.Value);
+            }
         }
 
         return true;
@@ -519,6 +530,44 @@ public class UrunService(
                 ("PttAVM",      "https://www.pttavm.com/arzum-ar3061-cayci-cay-makinesi-orijinal-cam-demlik-p-122936227"),
                 ("n11",         "https://www.n11.com/urun/arzum-ar3061-cayci-18-l-cay-makinesi-780794"),
             }),
+
+            // ── Moda (giyim, ayakkabı) ───────────────────────────────────────
+            // Teknosa/Çiçeksepeti elektronik+gıda ağırlıklı → Hepsiburada + n11 kullanıyoruz.
+            ("Moda", "Nike Air Force 1 '07", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/nike-air-force-1-07-sneaker-erkek-ayakkabi-dv0788-001-40-siyah-beyaz-pm-HBC00006DATRT"),
+                ("n11",         "https://www.n11.com/urun/nike-air-force-1-07-erkek-sneaker-ayakkabi-fd0654-100-beyaz-67363032"),
+            }),
+            ("Moda", "Adidas Samba OG", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/adidas-samba-og-erkek-sneaker-ih4881-pm-HBC00006YA3T6"),
+                ("n11",         "https://www.n11.com/urun/adidas-samba-og-unisex-kahverengi-spor-ayakkabi-id1481-kahverengi-70990540"),
+            }),
+
+            // ── Kozmetik (makyaj, cilt bakımı) ───────────────────────────────
+            ("Kozmetik", "Maybelline Lash Sensational Sky High Maskara", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/maybelline-new-york-lash-sensational-sky-high-maskara-p-HBV00001B1F33"),
+                ("n11",         "https://www.n11.com/urun/maybelline-new-york-lash-sensational-sky-high-maskara-siyah-2729654"),
+            }),
+            ("Kozmetik", "Nivea Q10 Power Anti-Wrinkle Day Cream 50ml", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/nivea-q10-power-kirisiklik-karsiti-spf15-gunduz-yuz-bakim-kremi-50-ml-pm-HBC00006G3BQK"),
+                ("n11",         "https://www.n11.com/urun/nivea-q10-power-kirisik-karsiti-sikilastirici-gunduz-kremi-50-ml-2601530"),
+            }),
+
+            // ── Otomotiv (oto aksesuar, yedek parça) ─────────────────────────
+            ("Otomotiv", "Bosch S4 Silver 12V 74Ah Akü", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/bosch-aku-12v-74ah-s4-silver-serisi-680-cca-pm-HB00000KEXWD"),
+                ("n11",         "https://www.n11.com/urun/bosch-12v-74-ah-680-en-standart-72-amper-ebatinda-507492291-aku-26043384"),
+            }),
+            ("Otomotiv", "Castrol Magnatec 10W-40 4L Motor Yağı", new[]
+            {
+                ("Hepsiburada", "https://www.hepsiburada.com/castrol-magnatec-10w40-4-lt-motor-yagi-pm-otm652002"),
+                ("n11",         "https://www.n11.com/urun/castrol-magnatec-10w-40-a3-b4-yari-sentetik-motor-yagi-4-l-2422050"),
+            }),
+
             // Atlanan modeller (yeterli kapsam yok, 2026-05-13):
             //   • Samsung Galaxy A57 — sadece 2 sitede
             //   • Xiaomi Redmi 14    — pazarda yok (Note 14 / 14C var)

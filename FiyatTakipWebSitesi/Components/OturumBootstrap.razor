@@ -1,0 +1,23 @@
+@* =====================================================
+   OturumBootstrap.razor
+   Görünmez, küçük bir InteractiveServer component.
+   MainLayout'a yerleştirilir. SignalR circuit kurulur
+   kurulmaz çalışır, OturumDurumu.BaslangictaYukleAsync
+   ile "Beni Hatırla" verisini localStorage'dan okur ve
+   varsa otomatik giriş yaptırır.
+   ===================================================== *@
+@rendermode InteractiveServer
+@inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
+
+@code {
+    bool yuklemeYapildi = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !yuklemeYapildi)
+        {
+            yuklemeYapildi = true;
+            await Oturum.BaslangictaYukleAsync();
+        }
+    }
+}

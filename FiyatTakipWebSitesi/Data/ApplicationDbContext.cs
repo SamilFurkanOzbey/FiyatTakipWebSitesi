@@ -21,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Urun> Urunler { get; set; } = null!;
     public DbSet<FiyatGecmisi> FiyatGecmisleri { get; set; } = null!;
     public DbSet<Uyari> Uyarilar { get; set; } = null!;
+    public DbSet<TakipModeli> TakipModelleri { get; set; } = null!;
 
     // Tablo ilişkilerini, kısıtlamaları ve index'leri burada yapılandırıyoruz
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -129,5 +130,34 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // Uyarılarda oluşturulma tarihine göre hızlı sorgulama için index
         modelBuilder.Entity<Uyari>()
             .HasIndex(uy => uy.OlusturulmaTarihi);
+
+        // ── TakipModeli ilişkileri ───────────────────────────────────
+        // Kullanıcı silinirse takip kayıtları da silinir
+        modelBuilder.Entity<TakipModeli>()
+            .HasOne(t => t.Kullanici)
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Model silinirse takip kayıtları da silinir
+        modelBuilder.Entity<TakipModeli>()
+            .HasOne(t => t.UrunModeli)
+            .WithMany()
+            .HasForeignKey(t => t.UrunModeliId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Aynı kullanıcı aynı modeli iki kez takipe alamaz
+        modelBuilder.Entity<TakipModeli>()
+            .HasIndex(t => new { t.UserId, t.UrunModeliId })
+            .IsUnique();
+
+        // Para birimi alanları
+        modelBuilder.Entity<TakipModeli>()
+            .Property(t => t.HedefFiyat)
+            .HasPrecision(10, 2);
+
+        modelBuilder.Entity<TakipModeli>()
+            .Property(t => t.SonBildirilenEnUcuz)
+            .HasPrecision(10, 2);
     }
 }

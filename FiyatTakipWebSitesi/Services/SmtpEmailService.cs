@@ -94,14 +94,14 @@ public sealed class SmtpEmailService : IEmailService
 <html><body style='font-family:Segoe UI,Arial,sans-serif;background:#f1f5f9;padding:24px;'>
   <div style='max-width:560px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);'>
     <div style='background:linear-gradient(135deg,#0284c7,#2563eb);color:white;padding:20px 24px;'>
-      <h2 style='margin:0;font-size:1.25rem;'>📊 FiyatTakip Bildirimi</h2>
+      <h2 style='margin:0;font-size:1.25rem;'>📊 ŞAM Bildirimi</h2>
     </div>
     <div style='padding:24px;color:#1e293b;'>
       <h3 style='margin:0 0 12px;color:#0f172a;'>{System.Net.WebUtility.HtmlEncode(baslik)}</h3>
       <p style='line-height:1.6;color:#475569;'>{safeMesaj}</p>
     </div>
     <div style='background:#f8fafc;padding:14px 24px;color:#94a3b8;font-size:0.8rem;text-align:center;border-top:1px solid #e2e8f0;'>
-      Bu e-posta FiyatTakipWebSitesi otomatik bildirim sistemi tarafından gönderildi.
+      Bu e-posta ŞAM (Fiyat Takip Sistemi) tarafından otomatik gönderildi.
     </div>
   </div>
 </body></html>";
@@ -115,6 +115,6 @@ public sealed class SmtpEmailService : IEmailService
         public string User { get; set; } = "";
         public string Password { get; set; } = "";
         public string From { get; set; } = "";
-        public string FromName { get; set; } = "FiyatTakip Bildirim";
+        public string FromName { get; set; } = "ŞAM Bildirim";
     }
 }

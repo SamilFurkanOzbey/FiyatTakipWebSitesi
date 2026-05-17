@@ -15,7 +15,7 @@
 @using FiyatTakipWebSitesi.DTOs
 @using Microsoft.EntityFrameworkCore
 @implements IDisposable
-<PageTitle>Hesap</PageTitle>
+<PageTitle>Hesap | ŞAM</PageTitle>
 
 <div class="hesap-page">
 
@@ -74,6 +74,11 @@
                 <div class="form">
                     <input type="email" placeholder="E-posta" @bind="girisEmail" class="input" />
                     <input type="password" placeholder="Şifre" @bind="girisSifre" class="input" />
+                    <label class="hatirla-row">
+                        <input type="checkbox" @bind="beniHatirla" class="check" />
+                        <span>Beni Hatırla</span>
+                        <small>(bu cihazda bir sonraki ziyarette otomatik giriş)</small>
+                    </label>
                     <button class="btn-ana" @onclick="GirisYap" disabled="@islemDevam">
                         @(islemDevam ? "⏳ Giriş yapılıyor..." : "🔑 Giriş Yap")
                     </button>
@@ -181,6 +186,41 @@
         box-sizing: border-box;
     }
     .input:focus { outline: none; border-color: #38bdf8; }
+
+    /* Beni Hatırla checkbox */
+    .hatirla-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 8px 4px;
+        flex-wrap: wrap;
+    }
+    .hatirla-row .check {
+        appearance: none;
+        width: 18px; height: 18px;
+        border: 2px solid #475569;
+        border-radius: 4px;
+        background: #0f172a;
+        cursor: pointer;
+        position: relative;
+        flex-shrink: 0;
+    }
+    .hatirla-row .check:checked {
+        background: #2563eb;
+        border-color: #2563eb;
+    }
+    .hatirla-row .check:checked::after {
+        content: '✓';
+        color: white;
+        font-size: 14px;
+        position: absolute;
+        top: -3px;
+        left: 2px;
+        font-weight: 700;
+    }
+    .hatirla-row span { color: #cbd5e1; font-size: 0.92rem; font-weight: 500; }
+    .hatirla-row small { color: #64748b; font-size: 0.75rem; flex-basis: 100%; margin-left: 26px; }
 
     .btn-ana {
         background: linear-gradient(135deg, #0284c7, #2563eb);
@@ -317,6 +357,7 @@
     string aktifTab = "giris";
     string girisEmail = "";
     string girisSifre = "";
+    bool beniHatirla = true; // Varsayılan açık — kullanıcı isterse kapatır
     string kayitAd = "";
     string kayitSoyad = "";
     string kayitEmail = "";
@@ -367,11 +408,11 @@
             var istek = new GirisRequest { Email = girisEmail.Trim(), Sifre = girisSifre };
             var yanit = await KullaniciServisi.GirisAsync(istek);
 
-            // OturumDurumu'na kullanıcı bilgisini yaz
+            // OturumDurumu'na kullanıcı bilgisini yaz + "Beni Hatırla" durumuna göre localStorage
             var kullanici = await Db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == yanit.KullaniciId);
             if (kullanici is not null)
             {
-                Oturum.GirisYap(kullanici);
+                await Oturum.GirisYapAsync(kullanici, beniHatirla);
                 await ProfilVerileriniYukle();
             }
 
@@ -423,11 +464,11 @@
             };
             var yanit = await KullaniciServisi.KayitAsync(istek);
 
-            // Kayıt sonrası otomatik giriş yap
+            // Kayıt sonrası otomatik giriş yap — yeni kullanıcı varsayılan olarak hatırlansın
             var kullanici = await Db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == yanit.KullaniciId);
             if (kullanici is not null)
             {
-                Oturum.GirisYap(kullanici);
+                await Oturum.GirisYapAsync(kullanici, hatirla: true);
                 await ProfilVerileriniYukle();
             }
 
@@ -490,9 +531,9 @@
         });
     }
 
-    void CikisYap()
+    async Task CikisYap()
     {
-        Oturum.CikisYap();
+        await Oturum.CikisYapAsync();
         // Form alanlarını sıfırla
         girisEmail = ""; girisSifre = "";
         aktifTab = "giris";
