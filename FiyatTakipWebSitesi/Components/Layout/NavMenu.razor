@@ -4,54 +4,58 @@
 @inject NavigationManager NavManager
 @implements IDisposable
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">📊 ŞAM</a>
+<div class="top-row navbar navbar-dark">
+    <div class="container-fluid justify-content-center">
+        <a class="navbar-brand logo-text" href="">
+            <span class="logo-icon">🛒</span>
+            <span class="logo-main">ŞAM</span>
+        </a>
     </div>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
+    <nav class="nav flex-column mt-3">
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                🏠 Ana Sayfa
+                <span class="nav-icon">🏠</span> Ana Sayfa
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="/kategoriler" Match="NavLinkMatch.Prefix">
-                📦 Kategoriler
+                <span class="nav-icon">📦</span> Kategoriler
             </NavLink>
         </div>
 
-        @* Kategoriler sayfasındaysa altta kategori listesi açılır *@
         @if (KategorilerSayfasinda())
         {
             <div class="alt-menu">
+                <a class="alt-link @(aktifKategoriId == 0 ? "active" : "")" href="/kategoriler" @onclick="() => aktifKategoriId = 0">
+                    <span class="alt-ikon">🔥</span> Popüler
+                </a>
+
                 @foreach (var kat in dbKategoriler)
                 {
-                    <NavLink class="alt-link"
-                             href="@($"/kategoriler?kategori={kat.Id}")"
-                             Match="NavLinkMatch.All">
-                        <span class="alt-ikon">@(string.IsNullOrEmpty(kat.Icon) ? "📦" : kat.Icon)</span>
+                    <a class="alt-link @(aktifKategoriId == kat.Id ? "active" : "")" href="@($"/kategoriler?kategori={kat.Id}")" @onclick="() => aktifKategoriId = kat.Id">
+                        <span class="alt-ikon">@(string.IsNullOrEmpty(kat.Icon) ? "▪" : kat.Icon)</span>
                         @kat.Ad
-                    </NavLink>
+                    </a>
                 }
             </div>
         }
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="/takip">
-                ⭐ Takip Ettiklerim
+                <span class="nav-icon">⭐</span> Takip Ettiklerim
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="/hesap">
-                👤 Hesap
+                <span class="nav-icon">👤</span> Hesap
             </NavLink>
         </div>
 
@@ -59,45 +63,45 @@
 </div>
 
 <style>
+    @@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap');
+
+    .logo-text {
+        display: flex; align-items: center; gap: 6px; font-family: 'Montserrat', sans-serif;
+        font-size: 1.8rem !important; letter-spacing: -2px; text-decoration: none; color: #ffffff;
+    }
+    .logo-main { color: #ffffff; }
+    .logo-icon { font-size: 1.6rem; filter: drop-shadow(0px 0px 6px rgba(23, 162, 184, 0.8)); }
+
     .alt-menu {
-        background: #0f172a;
-        border-left: 3px solid #38bdf8;
-        margin: 4px 12px 8px 22px;
-        padding: 6px 4px;
-        border-radius: 0 8px 8px 0;
+        background: #252526; border-left: 2px solid #5c5c5c; margin: 4px 12px 8px 22px; padding: 6px 4px; border-radius: 0 8px 8px 0;
     }
     .alt-link {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 9px 14px;
-        color: #94a3b8;
-        text-decoration: none;
-        border-radius: 6px;
-        font-size: 0.9rem;
-        transition: all 0.2s;
-        margin: 2px 0;
+        display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+        color: #7a7a7a; /* Pasifken daha silik ve karanlık */
+        text-decoration: none; border-radius: 6px; font-size: 0.9rem; transition: all 0.25s ease; margin: 2px 0;
     }
-    .alt-link:hover {
-        background: #1e293b;
-        color: #cbd5e1;
-    }
+    .alt-link:hover { background: #333333; color: #d1d1d1; }
+    
+    /* SEÇİLEN KATEGORİNİN PARLAK HALİ */
     .alt-link.active {
-        background: linear-gradient(135deg, #0284c7, #2563eb);
-        color: white;
-        font-weight: 600;
+        background: #404043; color: #ffffff !important; font-weight: 700;
+        border-left: 3px solid #ffffff; /* Sadece seçilene beyaz çizgi */
     }
+    
     .alt-ikon { font-size: 1.05rem; flex-shrink: 0; }
+    .nav-icon { font-size: 1.2rem; margin-right: 8px; }
 </style>
 
 @code {
     List<FiyatTakipWebSitesi.Models.Kategori> dbKategoriler = new();
+    int aktifKategoriId = 0; // Hangi kategoride olduğumuzu manuel takip ediyoruz
 
     protected override async Task OnInitializedAsync()
     {
         dbKategoriler = await KategoriServisi.GetAllAsync();
         NavManager.LocationChanged += OnLocationChanged;
         Oturum.Degisti += UpdateUi;
+        UrlKontrolEt();
     }
 
     public void Dispose()
@@ -107,7 +111,10 @@
     }
 
     void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-        => UpdateUi();
+    {
+        UrlKontrolEt();
+        UpdateUi();
+    }
 
     void UpdateUi() => InvokeAsync(StateHasChanged);
 
@@ -115,5 +122,15 @@
     {
         var path = NavManager.ToBaseRelativePath(NavManager.Uri);
         return path.StartsWith("kategoriler", StringComparison.OrdinalIgnoreCase);
+    }
+
+    void UrlKontrolEt()
+    {
+        var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("kategori", out var idStr) && int.TryParse(idStr, out var id))
+            aktifKategoriId = id;
+        else
+            aktifKategoriId = 0; // Popüler
     }
 }
