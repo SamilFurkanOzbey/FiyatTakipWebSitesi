@@ -112,6 +112,10 @@ ipch/
 *.VC.db
 *.VC.VC.opendb
 
+# SQLite WAL mode auxiliary files
+*.db-shm
+*.db-wal
+
 # Visual Studio profiler
 *.psess
 *.vsp
