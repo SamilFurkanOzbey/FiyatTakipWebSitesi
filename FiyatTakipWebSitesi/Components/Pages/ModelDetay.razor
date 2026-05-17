@@ -84,11 +84,18 @@
                 @foreach (var liste in siralanmisListeler)
                 {
                     var enDusukMu = liste.SonFiyati == enDusuk && enDusuk > 0;
+                    var siteAdi = SiteAdiFromUrl(liste.URL);
+                    var saticiFarkli = !string.IsNullOrEmpty(liste.Satici)
+                        && !string.Equals(liste.Satici, siteAdi, StringComparison.OrdinalIgnoreCase);
                     <div class="liste-satir @(enDusukMu ? "en-dusuk" : "")">
                         <div class="hucre site-hucre">
-                            <span class="site-ikon">@SiteIkon(liste.Satici)</span>
+                            <span class="site-ikon">@SiteIkonFromUrl(liste.URL)</span>
                             <div class="site-bilgi">
-                                <span class="site-ad">@liste.Satici</span>
+                                <span class="site-ad">@siteAdi</span>
+                                @if (saticiFarkli)
+                                {
+                                    <span class="satici-alt">Satıcı: @liste.Satici</span>
+                                }
                                 @if (enDusukMu)
                                 {
                                     <span class="rozet-en-iyi">🏆 En İyi Fiyat</span>
@@ -277,6 +284,7 @@
     }
     .site-bilgi { display: flex; flex-direction: column; gap: 4px; }
     .site-ad { color: #f1f5f9; font-weight: 600; font-size: 1rem; }
+    .satici-alt { color: #64748b; font-size: 0.75rem; margin-top: 2px; font-style: italic; }
     .rozet-en-iyi {
         background: #16a34a;
         color: white;
@@ -400,14 +408,23 @@
             NavManager.NavigateTo("/kategoriler");
     }
 
-    // Site adına göre emoji/ikon (logo yerine geçici)
-    static string SiteIkon(string satici) => satici.ToLowerInvariant() switch
+    // URL'den site adı (Satici alanı yanıltıcı olabilir — Lenovo, WebBT vs)
+    static string SiteAdiFromUrl(string url) =>
+        FiyatTakipWebSitesi.Services.ScraperService.SiteAdi(
+            FiyatTakipWebSitesi.Services.ScraperService.SiteTespit(url));
+
+    // URL'den site ikonu — URL host'una bakarak doğru emojiyi döner
+    static string SiteIkonFromUrl(string url)
     {
-        var s when s.Contains("hepsi")    => "🟠",
-        var s when s.Contains("çiçek") || s.Contains("cicek") => "🌸",
-        var s when s.Contains("teknosa")  => "🔵",
-        var s when s.Contains("n11")      => "🟣",
-        var s when s.Contains("ptt")      => "🟡",
-        _ => "🏪"
-    };
+        var site = FiyatTakipWebSitesi.Services.ScraperService.SiteTespit(url);
+        return site switch
+        {
+            FiyatTakipWebSitesi.Services.ScraperService.Site.Hepsiburada => "🟠",
+            FiyatTakipWebSitesi.Services.ScraperService.Site.Ciceksepeti => "🌸",
+            FiyatTakipWebSitesi.Services.ScraperService.Site.Teknosa => "🔵",
+            FiyatTakipWebSitesi.Services.ScraperService.Site.N11 => "🟣",
+            FiyatTakipWebSitesi.Services.ScraperService.Site.Pttavm => "🟡",
+            _ => "🏪"
+        };
+    }
 }

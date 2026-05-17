@@ -244,20 +244,14 @@ public class UrunService(
     {
         if (detay.FiyatSayi <= 0)
         {
-            // Scrape başarısız oldu. Ürün DAHA ÖNCE çalışıyorduysa (SonFiyati > 0)
-            // bu büyük ihtimalle "stok kalktı / listeleme kapandı" demektir →
-            // pasifleştir. Yeni seed edilen (henüz hiç fiyatı olmamış) ürünleri
-            // ilk denemede pasifleştirmeyiz, çünkü geçici anti-bot/network
-            // sorunu olabilir.
-            var pasif = await _context.Urunler.FirstOrDefaultAsync(u => u.Id == urunId);
-            if (pasif is not null && pasif.Aktif && pasif.SonFiyati > 0)
-            {
-                pasif.Aktif = false;
-                await _context.SaveChangesAsync();
-                _logger.LogWarning(
-                    "[UrunService] Ürün #{Id} otomatik pasifleştirildi (Satıcı: {Satici}, son fiyat: {Fiyat:N2}) — scrape fiyat döndüremedi, muhtemelen stok yok.",
-                    urunId, pasif.Satici, pasif.SonFiyati);
-            }
+            // Scrape başarısız oldu — eskiden otomatik pasifleştirme yapıyorduk,
+            // ama tek bir scrape hatası (anti-bot, geçici network sorunu,
+            // sayfa yapısı değişikliği) bir ürünü "ölü" gibi göstermemeli.
+            // Sadece log'a düşür, fiyatı değiştirme. Manuel kontrol için
+            // Demo Paneli veya Hangfire dashboard kullanılabilir.
+            _logger.LogWarning(
+                "[UrunService] Ürün #{Id} scrape edilemedi — fiyat 0 döndü, aktiflik korunuyor.",
+                urunId);
             return false;
         }
 
@@ -648,10 +642,12 @@ public class UrunService(
         // Kod sahibi (Veri Avcısı) bir URL'yi seed listesinden silerse, DB'de zaten
         // var olan kaydı da pasifleştirmek lazım — yoksa Hangfire job'ı çalışmaya
         // devam eder ve "kategoriler" sayfasında ölü listingler gözükür.
-        // Sadece SİSTEM ürünleri (UrunModeliId != null) etkilenir; kullanıcının
-        // elle eklediği URL'lere (UrunModeliId == null) DOKUNULMAZ.
+        // Sadece GERÇEK sistem ürünleri (UrunModeliId != null AND UserId == null)
+        // etkilenir. Kullanıcının URL ile eklediği ürünler artık UrunModeliId'ye de
+        // bağlanıyor (çift taraflı entegrasyon), bu yüzden ek UserId filtresi şart —
+        // kullanıcının manuel eklediği URL seed'de yok diye pasifleştirilmez.
         var sistemUrunleri = await _context.Urunler
-            .Where(u => u.UrunModeliId != null && u.Aktif)
+            .Where(u => u.UrunModeliId != null && u.UserId == null && u.Aktif)
             .ToListAsync();
 
         int pasiflestirilen = 0;

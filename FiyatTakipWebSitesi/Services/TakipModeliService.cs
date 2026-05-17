@@ -147,7 +147,9 @@ public class TakipModeliService(ApplicationDbContext context, ILogger<TakipModel
                     : model.Listeler.Select(l => l.Resim).FirstOrDefault(r => !string.IsNullOrEmpty(r)) ?? "",
                 KategoriAd = model.Kategori?.Ad ?? "",
                 EnUcuzFiyat = enUcuzListe?.SonFiyati,
-                EnUcuzSatici = enUcuzListe?.Satici ?? "",
+                EnUcuzSatici = enUcuzListe is not null
+                    ? ScraperService.SiteAdi(ScraperService.SiteTespit(enUcuzListe.URL))
+                    : "",
                 EnUcuzUrunId = enUcuzListe?.Id ?? 0,
                 ToplamSite = model.Listeler.Count,
                 HedefFiyat = t.HedefFiyat,

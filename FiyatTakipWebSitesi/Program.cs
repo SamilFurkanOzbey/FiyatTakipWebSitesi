@@ -208,19 +208,19 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 });
 
 // ── Periyodik Job Kayıtları ───────────────────────────────────────────────────
-// Günde 2 kez: 06:00 (sabah) ve 18:00 (akşam). Selenium yükü ve anti-bot
-// riskini düşük tutmak için saatlik tarama yapılmıyor — kullanıcı tek ürünü
-// elle yenilemek isterse UrunService.TekUrunYenileAsync üzerinden tetikler.
+// SUNUM modu: Otomatik schedule'lar devre dışı (Cron.Yearly — yılda bir).
+// Hangfire dashboard'undan "Trigger now" ile elle çalıştırılabilir.
+// Üretime alırken normal cron'a geri dönülebilir: "0 6 * * *" / "0 18 * * *".
 RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
     recurringJobId: "fiyat-guncelle-gunluk-sabah",
     methodCall:     job => job.TumUrunlerGuncelleAsync(),
-    cronExpression: "0 6 * * *",
+    cronExpression: Cron.Yearly,
     options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
 RecurringJob.AddOrUpdate<FiyatGuncellemeJob>(
     recurringJobId: "fiyat-guncelle-gunluk-aksam",
     methodCall:     job => job.TumUrunlerGuncelleAsync(),
-    cronExpression: "0 18 * * *",
+    cronExpression: Cron.Yearly,
     options: new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
 // Eski saatlik job artık kullanılmıyor — Hangfire'dan da silinmesi gerekiyor.
