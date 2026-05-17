@@ -513,11 +513,16 @@
 
         // Tüm modelleri tek seferde topla (hem istatistik hem popüler için)
         var tumModeller = new List<PopulerKart>();
-        var listeSayisi = 0;
+        var distinctSiteler = new HashSet<FiyatTakipWebSitesi.Services.ScraperService.Site>();
         foreach (var k in kategoriler)
         {
             var ms = await UrunServisi.GetModellerByKategoriAsync(k.Id);
-            listeSayisi += ms.SelectMany(m => m.Listeler).Count(l => l.Aktif);
+            foreach (var url in ms.SelectMany(m => m.Listeler.Where(l => l.Aktif)).Select(l => l.URL))
+            {
+                var site = FiyatTakipWebSitesi.Services.ScraperService.SiteTespit(url);
+                if (site != FiyatTakipWebSitesi.Services.ScraperService.Site.Bilinmiyor)
+                    distinctSiteler.Add(site);
+            }
             foreach (var m in ms)
             {
                 var aktifListeler = m.Listeler.Where(l => l.Aktif && l.SonFiyati > 0).ToList();
@@ -538,7 +543,7 @@
             }
         }
         toplamModel = tumModeller.Count;
-        toplamSite = listeSayisi;
+        toplamSite = distinctSiteler.Count;
 
         // Popüler: fiyatlıları öne al, en yüksek fiyatlı 4'ü göster (premium ürünler)
         populer = tumModeller
