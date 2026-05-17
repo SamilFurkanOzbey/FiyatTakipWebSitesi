@@ -1,11 +1,3 @@
-@* =====================================================
-   Home.razor — Hibrit ana sayfa
-   1) Hero: başlık + 3 CTA buton
-   2) Özellikler: 3 ikon kart (otomatik, mail, karşılaştırma)
-   3) Kişisel:
-      - Giriş varsa  → Senin Takipteki Ürünler (ilk 4)
-      - Giriş yoksa  → Popüler Ürünler (ilk 4 model)
-   ===================================================== *@
 @page "/"
 @rendermode InteractiveServer
 @inject FiyatTakipWebSitesi.Services.UrunService UrunServisi
@@ -14,559 +6,497 @@
 @inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
 @inject NavigationManager NavManager
 @implements IDisposable
-<PageTitle>ŞAM</PageTitle>
 
-<div class="anasayfa">
+<PageTitle>ŞAM | Ana Sayfa</PageTitle>
 
-    @* ── HERO ────────────────────────────────────── *@
-    <section class="hero">
-        <div class="hero-icerik">
-            <div class="hero-rozet">📊 Fiyat Takip Sistemi · v1.0</div>
-            <h1>📊 ŞAM</h1>
-            <p class="hero-alt">
-                Hepsiburada, Çiçeksepeti, Teknosa, n11 ve PttAVM'den
-                <strong>tek ekrandan</strong> fiyat karşılaştır.
-                <br />Ürünün fiyatı düştüğünde anında <strong>e-posta</strong> al.
+<div class="home-container">
+    
+    <div class="version-tag">Fiyat Takip Sistemi v1.0</div>
+
+    @* --- SPLIT HERO ALANI --- *@
+    <div class="hero-split">
+        @* SOL TARAF: Logo, Alt Alta Tek Satır Metinler, Butonlar ve Hemen Altında Kategoriler *@
+        <div class="hero-left">
+            <div class="home-logo">
+                <span class="logo-icon">🛒</span>
+                <span class="logo-main">ŞAM</span>
+            </div>
+            
+            <p class="home-subtitle">
+                <span class="sub-line">Hepsiburada, Çiçeksepeti, Teknosa, n11 ve PttAVM'den <span class="highlight-text">tek ekrandan</span> fiyat karşılaştır.</span>
+                <span class="sub-line">Ürünün fiyatı düştüğünde anında <span class="highlight-text">e-posta</span> al.</span>
             </p>
 
-            <div class="hero-btnler">
-                <a href="/kategoriler" class="btn-hero birincil">📦 Kategorilere Gözat</a>
-                @if (Oturum.GirisYapildi)
-                {
-                    <a href="/takip" class="btn-hero ikincil">⭐ Takip Ettiklerim</a>
-                }
-                else
-                {
-                    <a href="/hesap" class="btn-hero ikincil">🔑 Kayıt Ol / Giriş Yap</a>
-                }
+            <div class="top-actions">
+                <a href="/kategoriler" class="action-btn">
+                    <span class="btn-icon">📦</span> Tüm Kategoriler
+                </a>
+                <a href="/takip" class="action-btn @(Oturum.GirisYapildi ? "" : "disabled-link")" title="@(Oturum.GirisYapildi ? "" : "Önce giriş yapmalısınız")">
+                    <span class="btn-icon">⭐</span> Takip Ettiklerim
+                </a>
             </div>
 
-            <div class="istatistik">
-                <div class="istat-blok">
-                    <span class="istat-rakam">@toplamModel</span>
-                    <span class="istat-yazi">Model</span>
+            @* ELİPS KATEGORİ HAPLARI *@
+            <div class="category-pills">
+                <button class="pill @(seciliKategoriId == 0 ? "active" : "")" @onclick="() => KategoriGetir(0)">
+                    🔥 Popüler
+                </button>
+
+                @foreach (var kat in vitrinKategorileri)
+                {
+                    <button class="pill @(seciliKategoriId == kat.Id ? "active" : "")" @onclick="() => KategoriGetir(kat.Id)">
+                        @kat.Ad
+                    </button>
+                }
+
+                <a href="/kategoriler" class="pill-plus" title="Diğer Kategoriler">
+                    +
+                </a>
+            </div>
+        </div>
+
+        @* SAĞ TARAF: Modern İstatistik Kartları *@
+        <div class="hero-right">
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <span class="stat-number">@toplamModel</span>
+                    <span class="stat-label">Model</span>
                 </div>
-                <div class="istat-blok">
-                    <span class="istat-rakam">@toplamSite</span>
-                    <span class="istat-yazi">Site</span>
+                <div class="stat-card">
+                    <span class="stat-number">@toplamSite</span>
+                    <span class="stat-label">Site</span>
                 </div>
-                <div class="istat-blok">
-                    <span class="istat-rakam">@toplamKategori</span>
-                    <span class="istat-yazi">Kategori</span>
+                <div class="stat-card">
+                    <span class="stat-number">@toplamKategori</span>
+                    <span class="stat-label">Kategori</span>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
 
-    @* ── ÖZELLİKLER ──────────────────────────────── *@
-    <section class="ozellikler">
-        <div class="ozellik">
-            <div class="ozellik-ikon">🤖</div>
-            <h3>Otomatik Takip</h3>
-            <p>Sistem arka planda 5 büyük e-ticaret sitesini sürekli izler, fiyatları güncel tutar.</p>
-        </div>
-        <div class="ozellik">
-            <div class="ozellik-ikon">📧</div>
-            <h3>Email Bildirim</h3>
-            <p>Takipteki ürünün fiyatı düşünce anında e-posta kutuna düşer, fırsatı kaçırmazsın.</p>
-        </div>
-        <div class="ozellik">
-            <div class="ozellik-ikon">🏆</div>
-            <h3>En Ucuzu Bul</h3>
-            <p>Her ürünün tüm sitelerdeki fiyatını yan yana gör, anlık en iyi fiyatı keşfet.</p>
-        </div>
-    </section>
-
-    @* ── BÖLÜM 1: Senin Takipteki Ürünler (giriş varsa ve takip varsa) ─ *@
-    @if (Oturum.GirisYapildi && takiptekiler.Count > 0)
-    {
-        <section class="kisisel">
-            <header class="kisisel-baslik">
-                <div>
-                    <h2>⭐ Senin Takipteki Ürünler</h2>
-                    <p>@takiptekiler.Count modeli takip ediyorsun</p>
-                </div>
-                <a href="/takip" class="hepsi-link">Hepsini Gör →</a>
-            </header>
-
+    @* ÜRÜN LİSTELEME ALANI *@
+    <div class="products-section">
+        @if (yukleniyor)
+        {
+            <div class="bos-durum">
+                <span style="font-size: 50px;">⏳</span>
+                <p>Ürünler yükleniyor...</p>
+            </div>
+        }
+        else if (aktifUrunler.Any())
+        {
             <div class="urun-grid">
-                @foreach (var k in takiptekiler.Take(4))
+                @foreach (var urun in aktifUrunler)
                 {
-                    <div class="urun-kart takipte" @onclick="() => Detay(k.ModelId)">
-                        <div class="takipte-rozet-mini">📌 TAKİPTE</div>
-                        <div class="kart-resim">
-                            @if (!string.IsNullOrEmpty(k.Resim))
+                    <div class="urun-card" @onclick="() => Detaya(urun)">
+                        <div class="card-img-container">
+                            @if (!string.IsNullOrEmpty(urun.Resim))
                             {
-                                <img src="@k.Resim" alt="@k.ModelAd" />
+                                <img src="@urun.Resim" alt="@urun.Ad" />
                             }
                             else
                             {
-                                <span class="placeholder">🖼️</span>
+                                <span style="font-size:60px; opacity:0.2;">🛍️</span>
                             }
                         </div>
-                        <div class="kart-bilgi">
-                            <span class="kategori-mini">@k.KategoriAd</span>
-                            <h4 title="@k.ModelAd">@k.ModelAd</h4>
-                            @if (k.EnUcuzFiyat.HasValue)
+                        <div class="card-info">
+                            <h4 title="@urun.Ad">@urun.Ad</h4>
+                            <p class="fiyat">@urun.Fiyat</p>
+                            @if (!string.IsNullOrEmpty(urun.AltBilgi))
                             {
-                                <p class="kart-fiyat yesil">@k.EnUcuzFiyat.Value.ToString("N2", trCulture) ₺</p>
-                                <p class="kart-altbilgi">🏪 @k.EnUcuzSatici</p>
+                                <p class="alt-bilgi">@urun.AltBilgi</p>
                             }
-                            else
+
+                            @if (urun.ModelId > 0)
                             {
-                                <p class="kart-bekleniyor">Fiyat bekleniyor</p>
+                                @if (urun.TakipEdiliyor)
+                                {
+                                    <button class="takip-btn takip-edildi"
+                                            @onclick="() => TakiptenCik(urun)"
+                                            @onclick:stopPropagation="true"
+                                            disabled="@urun.IslemDevam">
+                                        @if (urun.IslemDevam)
+                                        {
+                                            <span>⏳ Kaldırılıyor...</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="durum-varsayilan"><span class="yesil-tik">✓</span> Takip Ediliyor</span>
+                                            <span class="durum-hover">✕ Takipten Çık</span>
+                                        }
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="takip-btn"
+                                            @onclick="() => TakipEt(urun)"
+                                            @onclick:stopPropagation="true"
+                                            disabled="@urun.IslemDevam">
+                                        @(urun.IslemDevam ? "⏳ Ekleniyor..." : "📌 Takip Et")
+                                    </button>
+                                }
                             }
+
+                            <div class="btn-row">
+                                <NavLink href="@urun.DetayLink" class="detay-btn" @onclick:stopPropagation="true">🔍 Detay</NavLink>
+                                <NavLink href="@urun.GrafikLink" class="grafik-btn" @onclick:stopPropagation="true">📈 Grafik</NavLink>
+                            </div>
                         </div>
                     </div>
                 }
-            </div>
-        </section>
-    }
-
-    @* ── BÖLÜM 2: Popüler Modeller (HER ZAMAN gösterilir) ─────── *@
-    <section class="kisisel">
-        <header class="kisisel-baslik">
-            <div>
-                <h2>🔥 Popüler Modeller</h2>
-                <p>Sistemde en aktif izlenen ürünler</p>
-            </div>
-            <a href="/kategoriler" class="hepsi-link">Tüm Kataloğa Gözat →</a>
-        </header>
-
-        @if (populer.Count == 0)
-        {
-            <div class="bos-blok">
-                <div style="font-size:3rem;">📭</div>
-                <p>Henüz katalogda ürün yok.</p>
             </div>
         }
         else
         {
-            <div class="urun-grid">
-                @foreach (var m in populer)
-                {
-                    <div class="urun-kart" @onclick="() => Detay(m.ModelId)">
-                        <div class="kart-resim">
-                            @if (!string.IsNullOrEmpty(m.Resim))
-                            {
-                                <img src="@m.Resim" alt="@m.ModelAd" />
-                            }
-                            else
-                            {
-                                <span class="placeholder">🖼️</span>
-                            }
-                        </div>
-                        <div class="kart-bilgi">
-                            <span class="kategori-mini">@m.KategoriAd</span>
-                            <h4 title="@m.ModelAd">@m.ModelAd</h4>
-                            @if (m.EnUcuzFiyat.HasValue)
-                            {
-                                <p class="kart-fiyat">@m.EnUcuzFiyat.Value.ToString("N2", trCulture) ₺</p>
-                                <p class="kart-altbilgi">📍 @m.SiteSayisi sitede</p>
-                            }
-                            else
-                            {
-                                <p class="kart-bekleniyor">Fiyat bekleniyor</p>
-                            }
-                        </div>
-                    </div>
-                }
+            <div class="bos-durum">
+                <span style="font-size: 50px;">📭</span>
+                <p>Bu alanda henüz ürün yok.</p>
             </div>
         }
-    </section>
-
-    @* ── BÖLÜM 3: CTA Alt (sadece giriş yapmamışlar için) ───── *@
-    @if (!Oturum.GirisYapildi)
-    {
-        <section class="kisisel">
-            <div class="cta-alt">
-                <h3>Hemen Başla</h3>
-                <p>Ücretsiz hesap aç, sevdiğin ürünleri takibe al, fiyat düşünce mail al.</p>
-                <a href="/hesap" class="btn-hero birincil">🚀 Hesap Oluştur</a>
-            </div>
-        </section>
-    }
+    </div>
 </div>
 
 <style>
-    body { background: #0f172a; }
+    @@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap');
 
-    .anasayfa {
-        background: #0f172a;
-        color: white;
-        min-height: 100vh;
-    }
-
-    /* ── HERO ── */
-    .hero {
-        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #312e81 100%);
-        padding: 70px 40px 60px;
+    .home-container {
+        padding: 40px 20px;
+        max-width: 1200px;
+        margin: 0 auto;
         position: relative;
-        overflow: hidden;
     }
-    .hero::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.2), transparent 60%);
-        pointer-events: none;
-    }
-    .hero-icerik { position: relative; max-width: 1100px; margin: 0 auto; text-align: center; }
-    .hero-rozet {
-        display: inline-block;
-        background: rgba(56, 189, 248, 0.15);
-        color: #38bdf8;
-        padding: 5px 14px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 700;
-        margin-bottom: 18px;
-        border: 1px solid rgba(56, 189, 248, 0.3);
-        letter-spacing: 0.5px;
-    }
-    .hero h1 {
-        font-size: 3.2rem;
-        margin: 0 0 18px;
-        color: #f1f5f9;
-        font-weight: 800;
-        background: linear-gradient(135deg, #f1f5f9, #38bdf8);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    .hero-alt {
-        font-size: 1.15rem;
-        color: #cbd5e1;
-        max-width: 700px;
-        margin: 0 auto 30px;
-        line-height: 1.6;
-    }
-    .hero-alt strong { color: #38bdf8; }
 
-    .hero-btnler {
-        display: flex;
-        gap: 14px;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-bottom: 36px;
+    .version-tag {
+        position: absolute;
+        top: 0;
+        right: 20px;
+        background: #2a2a2e;
+        color: #9ba4b5;
+        padding: 4px 12px;
+        border-radius: 0 0 8px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border: 1px solid #4a4a4c;
+        border-top: none;
     }
-    .btn-hero {
-        text-decoration: none;
-        padding: 14px 28px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 0.98rem;
-        transition: all 0.2s;
+
+    /* SPLIT HERO STİLLERİ */
+    .hero-split {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-top: 20px;
+        margin-bottom: 30px;
+        padding: 20px 0;
+        gap: 40px;
+    }
+
+    .hero-left {
+        flex: 1.2;
+        text-align: left;
+    }
+
+    .hero-right {
+        flex: 0.8;
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 15px;
+    }
+
+    .home-logo {
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 3.5rem;
+        letter-spacing: -3px;
+        color: #ffffff;
+        margin-bottom: 15px;
     }
-    .btn-hero.kucuk { padding: 11px 22px; font-size: 0.9rem; margin-top: 10px; }
-    .btn-hero.birincil {
-        background: linear-gradient(135deg, #0284c7, #2563eb);
-        color: white;
-        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
-    }
-    .btn-hero.birincil:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(2, 132, 199, 0.5);
-        color: white;
-    }
-    .btn-hero.ikincil {
-        background: #1e293b;
-        color: #cbd5e1;
-        border: 1px solid #475569;
-    }
-    .btn-hero.ikincil:hover {
-        background: #334155;
-        color: white;
-        border-color: #38bdf8;
-    }
+    .logo-main { color: #ffffff; }
+    .logo-icon { font-size: 3rem; filter: drop-shadow(0px 0px 10px rgba(23, 162, 184, 0.8)); }
 
-    .istatistik {
+    /* CÜMLE YERLEŞİM AYARLARI */
+    .home-subtitle {
+        color: #9ba4b5;
+        font-size: 1.1rem;
+        margin-bottom: 25px;
+        line-height: 1.8;
         display: flex;
-        justify-content: center;
-        gap: 50px;
-        flex-wrap: wrap;
-        margin-top: 8px;
+        flex-direction: column;
+        gap: 6px;
     }
-    .istat-blok { display: flex; flex-direction: column; align-items: center; }
-    .istat-rakam {
-        color: #38bdf8;
-        font-size: 2.2rem;
-        font-weight: 800;
-        line-height: 1;
-    }
-    .istat-yazi {
-        color: #64748b;
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-top: 6px;
+    
+    .sub-line {
+        display: block;
+        white-space: nowrap;
     }
 
-    /* ── ÖZELLİKLER ── */
-    .ozellikler {
-        max-width: 1100px;
-        margin: -30px auto 0;
-        padding: 0 30px;
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 18px;
-        position: relative;
+    .highlight-text {
+        color: #17a2b8;
+        font-weight: 700;
     }
-    .ozellik {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 16px;
-        padding: 26px 22px;
-        text-align: center;
-        transition: all 0.2s;
-    }
-    .ozellik:hover {
-        transform: translateY(-3px);
-        border-color: #38bdf8;
-        box-shadow: 0 10px 24px rgba(56, 189, 248, 0.1);
-    }
-    .ozellik-ikon { font-size: 2.6rem; margin-bottom: 10px; }
-    .ozellik h3 { color: #f1f5f9; font-size: 1.05rem; margin: 0 0 8px; }
-    .ozellik p { color: #94a3b8; font-size: 0.88rem; margin: 0; line-height: 1.55; }
 
-    /* ── KİŞİSEL ── */
-    .kisisel {
-        max-width: 1200px;
-        margin: 50px auto;
-        padding: 0 30px;
-    }
-    .kisisel-baslik {
+    .top-actions {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        margin-bottom: 22px;
-        flex-wrap: wrap;
-        gap: 12px;
+        gap: 15px;
+        margin-bottom: 25px;
     }
-    .kisisel-baslik h2 {
-        font-size: 1.6rem;
-        color: #f1f5f9;
-        margin: 0 0 4px;
-    }
-    .kisisel-baslik p {
-        color: #94a3b8;
-        margin: 0;
-        font-size: 0.92rem;
-    }
-    .hepsi-link {
-        color: #38bdf8;
+
+    .action-btn {
+        background: #252526;
+        color: #ffffff;
+        border: 1px solid #4a4a4c;
+        padding: 12px 24px;
+        border-radius: 12px;
         text-decoration: none;
         font-weight: 600;
         font-size: 0.95rem;
-        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
     }
-    .hepsi-link:hover { color: #7dd3fc; text-decoration: underline; }
+    .action-btn:hover { background: #3e3e42; border-color: #9ba4b5; transform: translateY(-2px); }
+    .disabled-link { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-    .bos-blok {
-        background: #1e293b;
-        border: 1px dashed #475569;
+    /* İstatistik Kartları */
+    .stat-grid {
+        display: flex;
+        gap: 15px;
+    }
+
+    .stat-card {
+        background: #2a2a2e;
+        border: 1px solid #4a4a4c;
         border-radius: 16px;
-        padding: 40px 30px;
+        padding: 20px 25px;
         text-align: center;
-        color: #94a3b8;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+        min-width: 110px;
     }
-    .bos-blok p { margin: 12px 0; }
+    
+    .stat-card:hover { transform: translateY(-5px); border-color: #17a2b8; }
+    .stat-number { color: #17a2b8; font-size: 2.2rem; font-weight: 800; font-family: 'Montserrat', sans-serif; line-height: 1; margin-bottom: 5px; text-shadow: 0 0 10px rgba(23, 162, 184, 0.3); }
+    .stat-label { color: #b3b3b3; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
 
-    /* ── Ürün kartları (Home — kompakt) ── */
-    .urun-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 18px;
+    /* ELİPS KATEGORİ HAPLARI */
+    .category-pills {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
     }
-    .urun-kart {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 14px;
-        overflow: hidden;
-        cursor: pointer;
-        transition: all 0.25s;
-        display: flex; flex-direction: column;
-        position: relative;
-    }
-    .urun-kart:hover {
-        transform: translateY(-3px);
-        border-color: #38bdf8;
-        box-shadow: 0 10px 22px rgba(56, 189, 248, 0.15);
-    }
-    /* Takipteki kart için yeşil aksan + rozet */
-    .urun-kart.takipte {
-        border-left: 4px solid #16a34a;
-    }
-    .urun-kart.takipte:hover {
-        border-color: #4ade80;
-        border-left-color: #4ade80;
-        box-shadow: 0 10px 22px rgba(74, 222, 128, 0.18);
-    }
-    .takipte-rozet-mini {
-        position: absolute; top: 8px; right: 8px;
-        background: linear-gradient(135deg, #16a34a, #15803d);
-        color: white;
-        padding: 3px 9px;
-        border-radius: 999px;
-        font-size: 0.62rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 6px rgba(22, 163, 74, 0.45);
-        z-index: 2;
-    }
-    .kart-fiyat.yesil { color: #4ade80; }
-    .kart-resim {
-        width: 100%; height: 170px;
-        background: white;
-        display: flex; align-items: center; justify-content: center;
-    }
-    .kart-resim img { max-width: 100%; max-height: 100%; object-fit: contain; padding: 12px; }
-    .placeholder { font-size: 2.6rem; opacity: 0.4; }
-    .kart-bilgi { padding: 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .kategori-mini {
-        align-self: flex-start;
-        background: #0f172a;
-        color: #94a3b8;
-        padding: 3px 10px;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 600;
-        border: 1px solid #334155;
-    }
-    .kart-bilgi h4 {
-        margin: 4px 0; color: #f1f5f9;
-        font-size: 0.92rem; font-weight: 600; line-height: 1.3;
-        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-        overflow: hidden; min-height: 2.5em;
-    }
-    .kart-fiyat {
-        color: #38bdf8; font-size: 1.18rem; font-weight: 800;
-        margin: 4px 0 2px;
-    }
-    .kart-altbilgi {
-        color: #94a3b8; font-size: 0.76rem; margin: 0;
-    }
-    .kart-bekleniyor {
-        color: #fbbf24; font-size: 0.85rem; font-style: italic; margin: 4px 0;
-    }
+    .pill { background: #2a2a2e; color: #d1d1d1; border: 1px solid #4a4a4c; padding: 10px 24px; border-radius: 999px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+    .pill:hover { background: #3e3e42; color: #ffffff; }
+    .pill.active { background: #ffffff; color: #1a1a1a; border-color: #ffffff; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+    .pill-plus { width: 42px; height: 42px; background: #2a2a2e; color: #d1d1d1; border: 1px solid #4a4a4c; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 400; text-decoration: none; transition: all 0.3s ease; }
+    .pill-plus:hover { background: #3e3e42; color: #ffffff; border-color: #9ba4b5; transform: rotate(90deg); }
 
-    /* ── CTA Alt (giriş yapmamış için) ── */
-    .cta-alt {
-        background: linear-gradient(135deg, #1e3a8a, #312e81);
-        border: 1px solid #38bdf8;
-        border-radius: 18px;
-        padding: 38px 30px;
-        text-align: center;
-        margin-top: 40px;
-    }
-    .cta-alt h3 {
-        color: #f1f5f9;
-        font-size: 1.5rem;
-        margin: 0 0 8px;
-    }
-    .cta-alt p { color: #cbd5e1; margin: 0 0 6px; }
+    /* KART STİLLERİ */
+    .urun-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+    .urun-card { background: #252526; border-radius: 12px; overflow: hidden; border: 1px solid #4a4a4c; transition: 0.3s; cursor: pointer; }
+    .urun-card:hover { transform: translateY(-5px); border-color: #9ba4b5; box-shadow: 0 8px 15px rgba(0,0,0,0.2); }
+    .card-img-container { height: 200px; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 12px; }
+    .card-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .card-info { padding: 16px; }
+    .card-info h4 { font-size: 15px; margin-bottom: 10px; color: #ffffff; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; }
+    .fiyat { color: #ffffff; font-weight: 800; font-size: 1.25rem; margin: 0 0 4px; }
+    .alt-bilgi { color: #9ba4b5; font-size: 0.85rem; margin: 0 0 12px; font-weight: 500; }
 
-    /* ── Responsive ── */
-    @@media (max-width: 1024px) {
-        .urun-grid { grid-template-columns: repeat(3, 1fr); }
-    }
-    @@media (max-width: 768px) {
-        .hero { padding: 50px 24px 50px; }
-        .hero h1 { font-size: 2.2rem; }
-        .ozellikler { grid-template-columns: 1fr; padding: 0 24px; margin-top: -20px; }
-        .urun-grid { grid-template-columns: repeat(2, 1fr); }
-        .istatistik { gap: 24px; }
-    }
-    @@media (max-width: 480px) {
-        .urun-grid { grid-template-columns: 1fr; }
-        .hero h1 { font-size: 1.8rem; }
+    .takip-btn { width: 100%; background: #2a2a2e; color: #ffffff; border: 1px solid #5c5c5c; padding: 14px; border-radius: 8px; font-size: 17px; font-weight: 700; cursor: pointer; transition: all 0.25s ease; margin-top: 4px; }
+    .takip-btn:hover:not(:disabled) { background: #3a3a3e; }
+    .takip-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+    .takip-btn.takip-edildi { background: #2a2a2e; color: #ffffff; border: 2px solid #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.4); }
+    .yesil-tik { color: #4ade80; font-weight: 900; margin-right: 4px; font-size: 18px; }
+    .takip-btn.takip-edildi:hover:not(:disabled) { background: #4a1010; color: #fca5a5; border: 2px solid #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
+    .takip-btn.takip-edildi .durum-hover { display: none; }
+    .takip-btn.takip-edildi:hover:not(:disabled) .durum-varsayilan { display: none; }
+    .takip-btn.takip-edildi:hover:not(:disabled) .durum-hover { display: inline; }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    .detay-btn { background: #333333; flex: 1; text-align: center; padding: 8px; border-radius: 6px; border: 1px solid #4a4a4c; text-decoration: none; color: #d1d1d1; font-size: 13px; transition: all 0.2s; font-weight: 600;}
+    .grafik-btn { background: #2b2b2b; flex: 1; text-align: center; padding: 8px; border-radius: 6px; border: 1px solid #4a4a4c; text-decoration: none; color: #d1d1d1; font-size: 13px; transition: all 0.2s; font-weight: 600;}
+    .detay-btn:hover, .grafik-btn:hover { background: #4a4a4c; color: #ffffff; border-color: #9ba4b5; }
+
+    .bos-durum { text-align: center; margin-top: 60px; color: #7a7a7a; }
+    .bos-durum p { margin: 10px 0; font-size: 1.1rem; }
+
+    /* Mobil responsive iyileştirmesi */
+    @@media (max-width: 900px) {
+        .hero-split { flex-direction: column; text-align: center; gap: 20px; }
+        .hero-left { text-align: center; }
+        .sub-line { white-space: normal; } 
+        .top-actions { justify-content: center; }
+        .category-pills { justify-content: center; }
+        .hero-right { justify-content: center; width: 100%; }
+        .stat-grid { width: 100%; justify-content: center; }
     }
 </style>
 
 @code {
     static readonly System.Globalization.CultureInfo trCulture = new("tr-TR");
-
+    
+    int seciliKategoriId = 0;
+    bool yukleniyor = true;
+    
     int toplamModel = 0;
     int toplamSite = 0;
     int toplamKategori = 0;
-    List<TakipModelKart> takiptekiler = new();
-    List<PopulerKart> populer = new();
+
+    List<FiyatTakipWebSitesi.Models.Kategori> vitrinKategorileri = new();
+    List<UrunKart> aktifUrunler = new();
+    List<FiyatTakipWebSitesi.Models.Kategori> tumKategoriler = new();
 
     protected override async Task OnInitializedAsync()
     {
         Oturum.Degisti += UpdateUi;
-        await VerileriYukle();
+        
+        tumKategoriler = await KategoriServisi.GetAllAsync();
+        toplamKategori = tumKategoriler.Count;
+        vitrinKategorileri = tumKategoriler.Take(3).ToList();
+
+        await IstatistikleriHesapla();
+        await KategoriGetir(0);
     }
 
     public void Dispose() => Oturum.Degisti -= UpdateUi;
-
     void UpdateUi() => InvokeAsync(StateHasChanged);
 
-    async Task VerileriYukle()
+    async Task IstatistikleriHesapla()
     {
-        // İstatistikler — herkese
-        var kategoriler = await KategoriServisi.GetAllAsync();
-        toplamKategori = kategoriler.Count;
-
-        // Tüm modelleri tek seferde topla (hem istatistik hem popüler için)
-        var tumModeller = new List<PopulerKart>();
-        var listeSayisi = 0;
-        foreach (var k in kategoriler)
+        int modelSayisi = 0;
+        int siteSayisi = 0;
+        
+        foreach (var k in tumKategoriler)
         {
             var ms = await UrunServisi.GetModellerByKategoriAsync(k.Id);
-            listeSayisi += ms.SelectMany(m => m.Listeler).Count(l => l.Aktif);
-            foreach (var m in ms)
-            {
-                var aktifListeler = m.Listeler.Where(l => l.Aktif && l.SonFiyati > 0).ToList();
-                var enDusuk = aktifListeler.Any() ? aktifListeler.Min(l => l.SonFiyati) : (decimal?)null;
-                var resim = !string.IsNullOrEmpty(m.Resim)
-                    ? m.Resim
-                    : m.Listeler.Select(l => l.Resim).FirstOrDefault(r => !string.IsNullOrEmpty(r)) ?? "";
-
-                tumModeller.Add(new PopulerKart
-                {
-                    ModelId = m.Id,
-                    ModelAd = m.Ad,
-                    Resim = resim,
-                    KategoriAd = k.Ad,
-                    EnUcuzFiyat = enDusuk,
-                    SiteSayisi = m.Listeler.Count(l => l.Aktif),
-                });
-            }
+            modelSayisi += ms.Count();
+            siteSayisi += ms.SelectMany(m => m.Listeler).Count(l => l.Aktif);
         }
-        toplamModel = tumModeller.Count;
-        toplamSite = listeSayisi;
+        
+        toplamModel = modelSayisi;
+        toplamSite = siteSayisi;
+    }
 
-        // Popüler: fiyatlıları öne al, en yüksek fiyatlı 4'ü göster (premium ürünler)
-        populer = tumModeller
-            .OrderByDescending(p => p.EnUcuzFiyat.HasValue)
-            .ThenByDescending(p => p.EnUcuzFiyat ?? 0)
-            .Take(4)
-            .ToList();
+    async Task KategoriGetir(int katId)
+    {
+        seciliKategoriId = katId;
+        yukleniyor = true;
+        StateHasChanged();
 
-        // Giriş yapmış kullanıcı için kişisel takipler
-        if (Oturum.GirisYapildi)
+        if (katId == 0)
         {
-            takiptekiler = await TakipModeliServisi.GetKullaniciKartlariAsync(Oturum.KullaniciId!.Value);
+            var tumModeller = new List<FiyatTakipWebSitesi.Models.UrunModeli>();
+            foreach (var k in tumKategoriler)
+            {
+                tumModeller.AddRange(await UrunServisi.GetModellerByKategoriAsync(k.Id));
+            }
+            var populerModeller = tumModeller.OrderByDescending(x => x.Listeler.Count).Take(8).ToList();
+            await KartlariDoldur(populerModeller);
         }
         else
         {
-            takiptekiler = new();
+            var kategoriModelleri = await UrunServisi.GetModellerByKategoriAsync(katId);
+            await KartlariDoldur(kategoriModelleri.Take(8).ToList());
+        }
+
+        yukleniyor = false;
+        StateHasChanged();
+    }
+
+    async Task KartlariDoldur(List<FiyatTakipWebSitesi.Models.UrunModeli> hamModeller)
+    {
+        HashSet<int> takipModelIdleri = new();
+        if (Oturum.GirisYapildi)
+        {
+            takipModelIdleri = await TakipModeliServisi.KullaniciTakipModelIdleriAsync(Oturum.KullaniciId!.Value);
+        }
+
+        aktifUrunler = hamModeller.Select(m =>
+        {
+            var aktifListeler = m.Listeler.Where(l => l.Aktif && l.SonFiyati > 0).ToList();
+            decimal? enDusuk = aktifListeler.Any() ? aktifListeler.Min(l => l.SonFiyati) : (decimal?)null;
+            var saticiCount = m.Listeler.Count(l => l.Aktif);
+            var modelUrls = m.Listeler.Select(l => l.URL).ToList();
+            var resim = !string.IsNullOrEmpty(m.Resim) ? m.Resim : m.Listeler.Select(l => l.Resim).FirstOrDefault(r => !string.IsNullOrEmpty(r)) ?? "";
+
+            return new UrunKart
+            {
+                ModelId = m.Id,
+                ModelUrlleri = modelUrls,
+                TakipEdiliyor = takipModelIdleri.Contains(m.Id),
+                Ad = m.Ad,
+                Resim = resim,
+                Fiyat = enDusuk.HasValue ? $"{enDusuk.Value.ToString("N2", trCulture)} ₺" : "Fiyat bekleniyor",
+                AltBilgi = saticiCount > 0 ? $"📍 {saticiCount} sitede" : "",
+                DetayLink = $"/model/{m.Id}",
+                GrafikLink = aktifListeler.Any() ? $"/grafik/{aktifListeler.OrderBy(l => l.SonFiyati).First().Id}" : $"/model/{m.Id}"
+            };
+        }).ToList();
+    }
+
+    void Detaya(UrunKart kart) => NavManager.NavigateTo(kart.DetayLink);
+
+    async Task TakipEt(UrunKart kart)
+    {
+        if (!Oturum.GirisYapildi)
+        {
+            NavManager.NavigateTo("/hesap");
+            return;
+        }
+        
+        kart.IslemDevam = true;
+        StateHasChanged();
+        
+        try
+        {
+            await TakipModeliServisi.TakipEkleAsync(Oturum.KullaniciId!.Value, kart.ModelId);
+            kart.TakipEdiliyor = true;
+        }
+        finally
+        {
+            kart.IslemDevam = false;
+            StateHasChanged();
         }
     }
 
-    void Detay(int modelId) => NavManager.NavigateTo($"/model/{modelId}");
+    async Task TakiptenCik(UrunKart kart)
+    {
+        if (!Oturum.GirisYapildi) return;
+        
+        kart.IslemDevam = true;
+        StateHasChanged();
+        
+        try
+        {
+            await TakipModeliServisi.TakiptenCikAsync(Oturum.KullaniciId!.Value, kart.ModelId);
+            kart.TakipEdiliyor = false;
+        }
+        finally
+        {
+            kart.IslemDevam = false;
+            StateHasChanged();
+        }
+    }
 
-    class PopulerKart
+    class UrunKart
     {
         public int ModelId { get; set; }
-        public string ModelAd { get; set; } = "";
+        public List<string> ModelUrlleri { get; set; } = new();
+        public bool TakipEdiliyor { get; set; }
+        public bool IslemDevam { get; set; }
+        public string Ad { get; set; } = "";
         public string Resim { get; set; } = "";
-        public string KategoriAd { get; set; } = "";
-        public decimal? EnUcuzFiyat { get; set; }
-        public int SiteSayisi { get; set; }
+        public string Fiyat { get; set; } = "";
+        public string AltBilgi { get; set; } = "";
+        public string DetayLink { get; set; } = "";
+        public string GrafikLink { get; set; } = "";
     }
 }

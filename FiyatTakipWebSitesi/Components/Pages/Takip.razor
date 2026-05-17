@@ -1,9 +1,3 @@
-@* =====================================================
-   Takip.razor — İki bölüm:
-   1) URL ile ürün ekle (manuel, scraper) — eski özellik
-   2) Modeller (Hibrit) — /kategoriler'den Takip Et basılanlar
-   3) URL ile eklediklerim — manuel ekleme sonucu
-   ===================================================== *@
 @page "/takip"
 @rendermode InteractiveServer
 @inject ScraperService Scraper
@@ -79,7 +73,7 @@ else
             </div>
         }
 
-        @* ── URL EKLE — her zaman görünür ──────────────────── *@
+        @* ── URL EKLE — Kategori Seçimi Geri Geldi ──────────────────── *@
         <section class="ekle-kutu">
             <h3>🔗 URL ile Ekle</h3>
             <p class="kucuk-aciklama">
@@ -95,6 +89,7 @@ else
                        class="link-input"
                        disabled="@yukleniyor" />
 
+                @* KATEGORİ SEÇİMİ (Geri Getirildi) *@
                 <select @bind="secilenKategori" class="kategori-select" disabled="@yukleniyor">
                     @foreach (var k in kategoriler)
                     {
@@ -147,7 +142,7 @@ else
             }
         </section>
 
-        @* ── Takip ettiklerin — birleşik liste ─────────────────── *@
+        @* ── Takip ettiklerin — Daraltılmış Kartlar ─────────────────── *@
         <section>
             @if (modelKartlar.Count == 0)
             {
@@ -228,11 +223,11 @@ else
 }
 
 <style>
-    body { background: #0f172a; }
+    body { background: #202022; }
 
     .giris-kart {
         max-width: 500px; margin: 60px auto;
-        background: #1e293b; border: 1px solid #334155;
+        background: #252526; border: 1px solid #4a4a4c;
         border-radius: 20px; padding: 50px 30px;
         color: white; text-align: center;
     }
@@ -244,7 +239,7 @@ else
         border-radius: 10px; font-weight: 700; cursor: pointer;
     }
 
-    .takip-page { padding: 28px 32px; width: 100%; color: white; }
+    .takip-page { padding: 28px 32px; width: 100%; color: white; background: #202022; }
     header h1 { font-size: 1.9rem; margin: 0 0 6px; color: #f1f5f9; }
     .alt-yazi { color: #94a3b8; margin: 0 0 20px; line-height: 1.5; }
 
@@ -271,32 +266,7 @@ else
     .modal-ikon { font-size: 3rem; margin-bottom: 10px; }
     .modal-kart h3 { color: #f1f5f9; margin: 0 0 10px; font-size: 1.35rem; }
     .modal-aciklama { color: #cbd5e1; line-height: 1.5; margin: 0 0 22px; }
-    .modal-kiyas {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        gap: 14px;
-        align-items: center;
-        margin-bottom: 22px;
-    }
-    .kiyas-kart {
-        background: #0f172a;
-        border: 1px solid #334155;
-        border-radius: 12px;
-        padding: 14px;
-        text-align: left;
-    }
-    .kiyas-kart.mevcut { border-color: #16a34a; }
-    .kiyas-etiket {
-        color: #38bdf8; font-size: 0.68rem; font-weight: 700;
-        letter-spacing: 0.7px;
-    }
-    .kiyas-kart.mevcut .kiyas-etiket { color: #4ade80; }
-    .kiyas-ad {
-        color: #f1f5f9; font-size: 0.88rem; font-weight: 600;
-        margin: 6px 0 4px; line-height: 1.3;
-    }
-    .kiyas-fiyat { color: #94a3b8; font-size: 0.78rem; }
-    .kiyas-ok { color: #64748b; font-size: 1.5rem; }
+    
     .modal-btnler { display: flex; gap: 10px; flex-wrap: wrap; }
     .modal-btn {
         flex: 1; padding: 14px;
@@ -305,161 +275,121 @@ else
         display: flex; flex-direction: column; gap: 2px;
         transition: all 0.2s;
     }
-    .modal-btn small { font-size: 0.7rem; font-weight: 400; opacity: 0.85; }
-    .modal-btn.evet {
-        background: linear-gradient(135deg, #16a34a, #15803d);
-        color: white;
-    }
-    .modal-btn.evet:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(22,163,74,0.4); }
-    .modal-btn.hayir {
-        background: #334155;
-        color: #cbd5e1;
-        border: 1px solid #475569;
-    }
-    .modal-btn.hayir:hover { background: #475569; color: white; }
-
-    /* ── Tab bar ── */
-    .tab-bar {
-        display: flex;
-        gap: 6px;
-        background: #111827;
-        padding: 6px;
-        border-radius: 12px;
-        margin-bottom: 24px;
-        border: 1px solid #1e293b;
-    }
-    .tab-btn {
-        flex: 1;
-        background: transparent;
-        color: #94a3b8;
-        border: none;
-        padding: 12px 18px;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 0.95rem;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-    }
-    .tab-btn:hover:not(.active) { background: #1e293b; color: #cbd5e1; }
-    .tab-btn.active {
-        background: linear-gradient(135deg, #0284c7, #2563eb);
-        color: white;
-        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
-    }
-    .tab-sayi {
-        background: rgba(255,255,255,0.18);
-        color: white;
-        padding: 2px 10px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 700;
-        min-width: 24px;
-    }
-    .tab-btn:not(.active) .tab-sayi {
-        background: #1e293b;
-        color: #94a3b8;
-    }
+    .modal-btn.evet { background: linear-gradient(135deg, #16a34a, #15803d); color: white; }
+    .modal-btn.hayir { background: #334155; color: #cbd5e1; border: 1px solid #475569; }
 
     /* ── URL ekleme kutusu ── */
     .ekle-kutu {
-        background: #1e293b; border: 1px solid #334155;
-        border-radius: 16px; padding: 22px 26px;
+        background: #2a2a2e;
+        border: 1px solid #4a4a4c;
+        border-radius: 16px; 
+        padding: 22px 26px;
         margin-bottom: 30px;
+        max-width: 65%; /* Kategori eklendiği için kutuyu biraz genişlettik */
     }
-    .ekle-kutu h3 { margin: 0 0 4px; color: #f1f5f9; font-size: 1.1rem; }
-    .kucuk-aciklama { color: #94a3b8; font-size: 0.88rem; margin: 0 0 14px; }
-    .form-satir { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    @@media (max-width: 900px) {
+        .ekle-kutu { max-width: 100%; }
+        .form-satir { flex-wrap: wrap; }
+    }
+
+    .ekle-kutu h3 { margin: 0 0 4px; color: #ffffff; font-size: 1.1rem; }
+    .kucuk-aciklama { color: #b3b3b3; font-size: 0.88rem; margin: 0 0 14px; }
+    
+    .form-satir { 
+        display: flex; 
+        gap: 10px; 
+        align-items: center; 
+    }
     .link-input {
-        flex: 2 1 320px;
-        background: #0f172a; color: white;
-        border: 1px solid #475569; border-radius: 10px;
-        padding: 11px 14px; font-size: 0.95rem;
+        flex: 1; 
+        background: #3e3e42; 
+        color: white;
+        border: 1px solid #5c5c5c; 
+        border-radius: 10px;
+        padding: 11px 14px; 
+        font-size: 0.95rem;
     }
-    .link-input:focus { outline: none; border-color: #38bdf8; }
+    .link-input:focus { outline: none; border-color: #9ba4b5; }
+    
+    /* Geri Gelen Kategori Seçim Kutusu Stili */
     .kategori-select {
-        background: #0f172a; color: white;
-        border: 1px solid #475569; border-radius: 10px;
-        padding: 11px 14px; font-size: 0.95rem;
+        background: #3e3e42; 
+        color: white;
+        border: 1px solid #5c5c5c; 
+        border-radius: 10px;
+        padding: 11px 14px; 
+        font-size: 0.95rem;
+        cursor: pointer;
     }
+    .kategori-select:focus { outline: none; border-color: #9ba4b5; }
+
     .btn-ekle {
-        background: linear-gradient(135deg, #16a34a, #15803d);
+        background: #17a2b8; 
         color: white; border: none;
         padding: 11px 20px; border-radius: 10px;
         font-weight: 700; cursor: pointer; transition: all 0.2s;
     }
-    .btn-ekle:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(22,163,74,0.35); }
+    .btn-ekle:hover:not(:disabled) { background: #138496; transform: translateY(-2px); }
     .btn-ekle:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .adim-blok {
         margin-top: 18px; padding: 18px;
-        background: #0f172a; border-radius: 12px;
-        border: 1px solid #334155;
+        background: #202022; border-radius: 12px;
+        border: 1px solid #4a4a4c;
     }
     .adim-baslik { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .adim-h { margin: 0; color: white; font-size: 1rem; }
-    .adim-sub { margin: 0; color: #64748b; font-size: 0.78rem; }
+    .adim-sub { margin: 0; color: #9ba4b5; font-size: 0.78rem; }
     .adim-liste { display: flex; flex-direction: column; gap: 8px; }
     .adim-satir { display: flex; align-items: center; gap: 10px; }
     .adim-ikon { width: 22px; text-align: center; }
-    .adim-yazi { color: #94a3b8; font-size: 0.88rem; }
-    .adim-yazi.devam { color: #38bdf8; }
+    .adim-yazi { color: #b3b3b3; font-size: 0.88rem; }
+    .adim-yazi.devam { color: #17a2b8; }
     .ilerleme-cubuk {
-        margin-top: 14px; background: #1e293b;
+        margin-top: 14px; background: #3e3e42;
         border-radius: 999px; height: 6px; overflow: hidden;
     }
     .ilerleme-bar {
         height: 100%; border-radius: 999px;
-        background: linear-gradient(90deg, #3b82f6, #38bdf8);
+        background: #17a2b8;
         transition: width 0.6s ease;
     }
-    .ilerleme-yuzde { margin: 4px 0 0; font-size: 0.75rem; color: #64748b; text-align: right; }
+    .ilerleme-yuzde { margin: 4px 0 0; font-size: 0.75rem; color: #b3b3b3; text-align: right; }
 
     .donus-cember {
         width: 32px; height: 32px;
-        border: 3px solid #1e3a5f; border-top-color: #38bdf8;
+        border: 3px solid #3e3e42; border-top-color: #17a2b8;
         border-radius: 50%; animation: don 0.8s linear infinite;
         flex-shrink: 0;
     }
     .nokta-anim { display: inline-block; animation: don 1.2s linear infinite; }
     @@keyframes don { to { transform: rotate(360deg); } }
 
-    .mesaj-basari { color: #4ade80; background: #052e16; padding: 12px 16px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #16a34a; }
-    .mesaj-hata { color: #fca5a5; background: #450a0a; padding: 12px 16px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #dc2626; }
+    .mesaj-basari { color: #4ade80; background: rgba(74, 222, 128, 0.1); padding: 12px 16px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #16a34a; }
+    .mesaj-hata { color: #fca5a5; background: rgba(239, 68, 68, 0.1); padding: 12px 16px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #dc2626; }
 
-    /* ── Bölüm başlıkları ── */
-    .bolum-baslik { color: #f1f5f9; font-size: 1.3rem; margin: 0 0 16px; display: flex; align-items: center; gap: 12px; }
-    .adet { background: #1e293b; color: #94a3b8; padding: 3px 12px; border-radius: 999px; font-size: 0.8rem; border: 1px solid #334155; }
     .bos-kucuk {
-        background: #1e293b; border: 1px dashed #475569;
+        background: #252526; border: 1px dashed #4a4a4c;
         border-radius: 12px; padding: 28px;
-        color: #94a3b8; text-align: center;
+        color: #b3b3b3; text-align: center;
     }
-    .bos-kucuk a { color: #38bdf8; text-decoration: none; margin-left: 6px; }
+    .bos-kucuk a { color: #17a2b8; text-decoration: none; margin-left: 6px; }
     .bos-kucuk a:hover { text-decoration: underline; }
 
-    /* ──────────────────────────────────────────────────────────────
-       Takip Kartları — kataloktan farklı tasarım
-       • Sabit 4 kolon (büyük ekranda)
-       • Yeşil aksan (takip ediliyor vurgusu)
-       • "TAKİPTE" rozet ribbon
-       • En ucuz fiyat öne çıkan kutuda
-       ────────────────────────────────────────────────────────────── */
+    /* ── Daraltılmış Takip Kartları ── */
     .model-listesi {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);   /* SABİT 4 kart */
+        /* Kartların min genişliği 200px'e çekildi, yan yana daha fazla kart sığar */
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));   
         gap: 18px;
         margin-bottom: 32px;
     }
 
     .model-kart {
         position: relative;
-        background: linear-gradient(180deg, #1e293b 0%, #1a2638 100%);
-        border: 1px solid #334155;
-        border-left: 4px solid #16a34a;   /* Yeşil aksan — takip ediliyor */
+        background: #252526;
+        border: 1px solid #4a4a4c;
+        border-left: 4px solid #16a34a;   
         border-radius: 14px;
         overflow: hidden;
         cursor: pointer;
@@ -473,7 +403,6 @@ else
         box-shadow: 0 10px 24px rgba(74, 222, 128, 0.18);
     }
 
-    /* "TAKİPTE" rozeti — sağ üst köşede ribbon */
     .takipte-rozet {
         position: absolute; top: 10px; right: 10px;
         background: linear-gradient(135deg, #16a34a, #15803d);
@@ -488,7 +417,7 @@ else
     }
 
     .kart-resim {
-        width: 100%; height: 170px;
+        width: 100%; height: 150px; /* Dar kartlara uygun oran */
         background: white;
         display: flex; align-items: center; justify-content: center;
         overflow: hidden;
@@ -503,14 +432,13 @@ else
     }
     .kategori-rozet {
         align-self: flex-start;
-        background: #0f172a; color: #94a3b8;
+        background: #202022; color: #b3b3b3;
         padding: 3px 10px; border-radius: 6px;
         font-size: 0.7rem; font-weight: 600;
-        border: 1px solid #334155;
+        border: 1px solid #4a4a4c;
         text-transform: uppercase;
         letter-spacing: 0.4px;
     }
-    .kategori-rozet.kucuk { padding: 2px 9px; font-size: 0.7rem; }
     .kart-icerik h4 {
         margin: 2px 0 4px; color: #f1f5f9;
         font-size: 0.95rem; font-weight: 700; line-height: 1.3;
@@ -518,9 +446,8 @@ else
         overflow: hidden; min-height: 2.6em;
     }
 
-    /* Fiyat kutusu — kart içinde belirgin */
     .fiyat-kutu {
-        background: linear-gradient(135deg, #052e16, #14532d);
+        background: rgba(22, 163, 74, 0.1);
         border: 1px solid #16a34a;
         border-radius: 10px;
         padding: 10px 12px;
@@ -528,7 +455,7 @@ else
         margin: 4px 0 4px;
     }
     .fiyat-kutu.bekleniyor-kutu {
-        background: linear-gradient(135deg, #422006, #78350f);
+        background: rgba(245, 158, 11, 0.1);
         border-color: #f59e0b;
     }
     .fiyat-etiket {
@@ -538,16 +465,17 @@ else
     .bekleniyor-kutu .fiyat-etiket { color: #fbbf24; }
     .fiyat-deger {
         color: #4ade80;
-        font-size: 1.35rem;
+        font-size: 1.25rem; /* Genişlik daraldığı için font boyutu hafif küçültüldü */
         font-weight: 800;
         line-height: 1.1;
     }
     .fiyat-deger.sari { color: #fbbf24; font-size: 0.95rem; font-style: italic; }
     .fiyat-satici { color: #86efac; font-size: 0.74rem; margin-top: 2px; }
+    
     .site-bilgi {
-        color: #94a3b8; background: #0f172a;
+        color: #b3b3b3; background: #202022;
         padding: 5px 10px; border-radius: 6px;
-        font-size: 0.74rem; border: 1px solid #1e293b;
+        font-size: 0.74rem; border: 1px solid #4a4a4c;
         text-align: center;
     }
 
@@ -557,9 +485,9 @@ else
         cursor: pointer; font-size: 0.78rem; font-weight: 600;
         transition: filter 0.2s; text-align: center;
     }
-    .btn-detay { background: #475569; color: white; }
-    .btn-grafik { background: #0284c7; color: white; }
-    .btn-detay:hover, .btn-grafik:hover { filter: brightness(1.15); }
+    .btn-detay { background: #4a4a4c; color: white; }
+    .btn-grafik { background: #17a2b8; color: white; }
+    .btn-detay:hover, .grafik-btn:hover { filter: brightness(1.15); }
 
     .btn-cik-tam {
         width: 100%; margin-top: 2px;
@@ -578,8 +506,8 @@ else
     .btn-birlestir {
         width: 100%; margin-top: 4px;
         background: transparent;
-        color: #38bdf8;
-        border: 1px dashed #475569;
+        color: #17a2b8;
+        border: 1px dashed #4a4a4c;
         padding: 6px;
         border-radius: 6px;
         font-size: 0.74rem;
@@ -588,62 +516,36 @@ else
         transition: all 0.2s;
     }
     .btn-birlestir:hover {
-        background: #1e293b;
-        border-color: #38bdf8;
-        color: #7dd3fc;
+        background: #252526;
+        border-color: #17a2b8;
+        color: #48c6ef;
     }
 
     /* Modal label + select (birleştirme) */
     .modal-label {
         display: block;
         text-align: left;
-        color: #94a3b8;
+        color: #b3b3b3;
         font-size: 0.82rem;
         font-weight: 600;
         margin: 0 0 6px;
     }
     .modal-select {
         width: 100%;
-        background: #0f172a; color: white;
-        border: 1px solid #475569;
+        background: #202022; color: white;
+        border: 1px solid #4a4a4c;
         border-radius: 10px;
         padding: 12px 14px;
         font-size: 0.92rem;
         margin-bottom: 22px;
     }
-    .modal-select:focus { outline: none; border-color: #38bdf8; }
+    .modal-select:focus { outline: none; border-color: #17a2b8; }
 
-    /* Responsive — küçük ekranlarda kolon sayısını azalt */
-    @@media (max-width: 1200px) { .model-listesi { grid-template-columns: repeat(3, 1fr); } }
-    @@media (max-width: 900px)  { .model-listesi { grid-template-columns: repeat(2, 1fr); } }
-
-    /* ── Manuel kartlar (BÖLÜM 3) ── */
-    .manuel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; margin-bottom: 32px; }
-    .manuel-kart { background: #1e293b; border: 1px solid #334155; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
-    .manuel-resim { width: 100%; height: 160px; background: white; display: flex; align-items: center; justify-content: center; padding: 8px; }
-    .manuel-resim img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    .manuel-bilgi { padding: 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .manuel-ad { font-size: 0.9rem; color: #cbd5e1; font-weight: 600; line-height: 1.3; margin: 0;
-                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
-    .manuel-fiyat { font-size: 1.15rem; color: #38bdf8; font-weight: 700; margin: 4px 0 2px; }
-    .manuel-satici { color: #94a3b8; font-size: 0.78rem; margin: 0 0 8px; }
-    .manuel-btnler { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
-    .manuel-btn { text-align: center; padding: 7px; border-radius: 6px; text-decoration: none; font-size: 0.76rem; font-weight: 600; cursor: pointer; border: none; transition: filter 0.2s; }
-    .manuel-btn.koyu { background: #475569; color: white; }
-    .manuel-btn.mavi { background: #0284c7; color: white; }
-    .manuel-btn.kirmizi { background: #dc2626; color: white; }
-    .manuel-btn:hover { filter: brightness(1.15); color: white; }
-
-    @@media (max-width: 600px) {
-        .model-listesi { grid-template-columns: 1fr; }
-        .manuel-grid { grid-template-columns: 1fr; }
-    }
 </style>
 
 @code {
     static readonly System.Globalization.CultureInfo trCulture = new("tr-TR");
 
-    // ── Adım modeli ────────────────────────────────────────────
     enum AdimDurum { Bekliyor, Devam, Tamamlandi }
     class Adim
     {
@@ -653,29 +555,27 @@ else
 
     List<Adim> adimlar = new()
     {
-        new() { Metin = "Chrome tarayıcısı başlatılıyor" },
-        new() { Metin = "Sayfaya gidiliyor" },
-        new() { Metin = "Sayfa yüklenmesi bekleniyor" },
+        new() { Metin = "Katalogda taranıyor" },
+        new() { Metin = "Bağlantı kuruluyor" },
         new() { Metin = "Ürün adı ve fiyat okunuyor" },
         new() { Metin = "Resim ve satıcı bilgisi alınıyor" },
     };
     int ilerleme = 0;
 
-    // ── State ──────────────────────────────────────────────────
     List<Models.Kategori> dbKategoriler = new();
-    List<string> kategoriler = new() { "Telefon", "Bilgisayar", "Elektronik", "Giyim", "Diğer" };
-    string secilenKategori = "Telefon";
-
+    
+    /* Geri Eklenen Kategori Listesi ve Seçimi */
+    List<string> kategoriler = new();
+    string secilenKategori = "";
+    
     string yeniLink = "";
     string mesaj = "";
     bool hataVar = false;
     bool yukleniyor = false;
 
-    // Model bazlı kartlar (URL'den de TakipModeli'ne yazıldığı için her şey buraya düşer)
     List<TakipModelKart> modelKartlar = new();
     int? islemModelId = null;
 
-    // ── Manuel birleştirme (Seçenek A) ──
     bool birlestirAcik = false;
     TakipModelKart? birlestirKaynak = null;
     int birlestirHedefId = 0;
@@ -691,6 +591,8 @@ else
             await KategoriServisi.SeedVarsayilanKategorilerAsync();
             dbKategoriler = await KategoriServisi.GetAllAsync();
         }
+
+        /* Veritabanındaki kategorilerin adlarını Dropdown için ayır */
         kategoriler = dbKategoriler.Select(k => k.Ad).ToList();
         if (kategoriler.Any()) secilenKategori = kategoriler.First();
 
@@ -704,10 +606,6 @@ else
     {
         if (!Oturum.GirisYapildi) return;
         var uid = Oturum.KullaniciId!.Value;
-
-        // Tek liste: tüm takipler (kategorilerden + URL ile eklenenler birlikte)
-        // URL eklemeleri de UrunModeli'ne bağlanıp TakipModeli kaydı oluşturduğu için
-        // hepsi otomatik buraya düşer.
         modelKartlar = await TakipModeliServisi.GetKullaniciKartlariAsync(uid);
     }
 
@@ -728,7 +626,6 @@ else
             mesaj = urlHatasi; hataVar = true; return;
         }
 
-        // Bu URL zaten kullanıcının takiplerinde mi? Db'den kontrol
         var uid0 = Oturum.KullaniciId!.Value;
         var zatenVarUrl = await Db.Urunler.AnyAsync(u =>
             u.URL == temizLink && u.UserId == uid0 && u.Aktif);
@@ -746,11 +643,11 @@ else
         hataVar = false;
 
         var scrapeGorev = Scraper.GetUrunDetayAsync(temizLink);
-        int[] bekleme = { 800, 1200, 2500, 1500, 1000 };
+        int[] bekleme = { 800, 1200, 1500, 1000 };
         for (int i = 0; i < adimlar.Count; i++)
         {
             adimlar[i].Durum = AdimDurum.Devam;
-            ilerleme = (i + 1) * 18;
+            ilerleme = (i + 1) * 25;
             StateHasChanged();
             await Task.Delay(bekleme[i]);
             if (scrapeGorev.IsCompleted) break;
@@ -765,12 +662,10 @@ else
             StateHasChanged();
             await Task.Delay(400);
 
+            /* Kullanıcının seçtiği kategoriyi bul ve ID'sini çek */
             var kat = dbKategoriler.FirstOrDefault(k => k.Ad == secilenKategori) ?? dbKategoriler.FirstOrDefault();
             var katId = kat?.Id ?? 1;
 
-            // ── Çift taraflı fayda: URL'yi kataloğa da entegre et ──
-            // Aynı isimli model var mı bak (case-insensitive, in-memory karşılaştırma).
-            // Varsa o modele yeni site listemesi olarak ekle, yoksa yeni UrunModeli yarat.
             var tumModeller = await Db.UrunModelleri.AsNoTracking().ToListAsync();
             var mevcutModel = tumModeller.FirstOrDefault(m =>
                 string.Equals(m.Ad.Trim(), detay.Ad.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -784,7 +679,6 @@ else
             }
             else
             {
-                // Bu ürün katalogda henüz yok — yeni UrunModeli olarak ekle
                 var yeniModel = new Models.UrunModeli
                 {
                     Ad = detay.Ad,
@@ -799,7 +693,6 @@ else
                 yeniModelOlustu = true;
             }
 
-            // Kullanıcı bu URL'yi zaten ekledi mi?
             var zatenVar = await Db.Urunler.AnyAsync(u =>
                 u.URL == detay.Url && u.UserId == Oturum.KullaniciId && u.Aktif);
 
@@ -821,21 +714,17 @@ else
                 ParaBirimi = "TRY",
                 KategoriId = katId,
                 UserId = Oturum.KullaniciId,
-                UrunModeliId = modelId,    // ★ Modele bağla — kataloğa entegre
+                UrunModeliId = modelId,  
             };
 
             await UrunServisi.EkleAsync(yeniUrun);
-
-            // Kullanıcıyı bu modele TakipModeli kaydı olarak da ekle — böylece
-            // ana sayfa ve "Kategorilerden Takip Ettiklerim" bölümünde görünür.
             await TakipModeliServisi.TakipEkleAsync(Oturum.KullaniciId!.Value, modelId);
-
             await VerileriYukle();
 
             yeniLink = "";
             mesaj = yeniModelOlustu
-                ? $"✅ \"{detay.Ad}\" hem takip listene hem de kataloğa eklendi!"
-                : $"✅ \"{detay.Ad}\" takip listene eklendi (kataloğdaki modele bağlandı)";
+                ? $"✅ \"{detay.Ad}\" takip listene eklendi!"
+                : $"✅ \"{detay.Ad}\" takip listene eklendi (katalogdaki modele bağlandı)";
             hataVar = false;
         }
         catch (Exception ex)
@@ -849,7 +738,6 @@ else
         }
     }
 
-    /// <summary>İki ürün ismi arasındaki Dice benzerlik katsayısı (0..1).</summary>
     static decimal IsimBenzerlikSkoru(string a, string b)
     {
         var tokA = Tokenize(a);
@@ -865,8 +753,6 @@ else
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Where(t => t.Length > 1)
             .ToHashSet();
-
-    // ── Seçenek A: Manuel birleştirme ─────────────────────────
 
     void BirlestirAc(TakipModelKart kart)
     {
@@ -891,7 +777,6 @@ else
 
         try
         {
-            // Kaynak modelin Urun rows'larını hedef modele bağla
             var kaynakUrunler = await Db.Urunler
                 .Where(u => u.UrunModeliId == birlestirKaynak.ModelId)
                 .ToListAsync();
@@ -900,20 +785,17 @@ else
                 u.UrunModeliId = birlestirHedefId;
             await Db.SaveChangesAsync();
 
-            // Kaynak modelin TakipModeli kayıtlarını sil
             var kaynakTakipler = await Db.TakipModelleri
                 .Where(t => t.UrunModeliId == birlestirKaynak.ModelId)
                 .ToListAsync();
             Db.TakipModelleri.RemoveRange(kaynakTakipler);
 
-            // Kaynak UrunModeli sil
             var kaynakModel = await Db.UrunModelleri.FirstOrDefaultAsync(m => m.Id == birlestirKaynak.ModelId);
             if (kaynakModel is not null)
                 Db.UrunModelleri.Remove(kaynakModel);
 
             await Db.SaveChangesAsync();
 
-            // Kullanıcı zaten hedef modeli takip etmiyorsa, takipe al
             var uid = Oturum.KullaniciId!.Value;
             await TakipModeliServisi.TakipEkleAsync(uid, birlestirHedefId);
 

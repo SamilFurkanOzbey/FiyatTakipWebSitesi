@@ -1,6 +1,6 @@
 ﻿@inherits LayoutComponentBase
 
-@* "Beni Hatırla" sistemi — sayfa açılırken otomatik giriş kontrolü *@
+@* "Beni Hatırla" sistemi — Sayfa açılırken otomatik giriş kontrolü *@
 <FiyatTakipWebSitesi.Components.OturumBootstrap />
 
 <div class="page">
@@ -9,16 +9,30 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        @* Üst Bar: Sağ köşede parlayan yuvarlak profil butonu *@
+        <div class="top-header">
+            <div class="header-content">
+                <div class="page-info">
+                    @* Sol taraf şık bir boşluk olarak kalıyor *@
+                </div>
+                
+                <div class="user-actions">
+                    @* İstediğin o yuvarlak hesap sayfası butonu *@
+                    <NavLink href="/hesap" class="profile-circle-btn">
+                        <span class="profile-icon">👤</span>
+                    </NavLink>
+                </div>
+            </div>
         </div>
 
+        @* İçerik Alanı: pading mesafeleri bozulmadan korundu *@
         <article class="content px-4">
             @Body
         </article>
     </main>
 </div>
 
+@* Standart Blazor Hata Arayüzü (Aynen Korundu) *@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
