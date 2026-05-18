@@ -76,7 +76,8 @@
                 <option value="0">— Ürün seç —</option>
                 @foreach (var u in urunler)
                 {
-                    var rozet = u.UserId.HasValue ? $"👤 #{u.UserId}" : "⚠ Bağsız";
+                    var takipciSayisi = u.UrunModeliId.HasValue && modelTakipSayilari.TryGetValue(u.UrunModeliId.Value, out var s) ? s : 0;
+                    var rozet = takipciSayisi > 0 ? $"👥 {takipciSayisi} takipçi" : "—";
                     <option value="@u.Id">[@rozet] @u.Ad — @u.Satici (@u.SonFiyati.ToString("N2", trCulture) ₺)</option>
                 }
             </select>
@@ -409,6 +410,7 @@
 @code {
     List<FiyatTakipWebSitesi.Models.Urun> urunler = new();
     List<FiyatTakipWebSitesi.Models.Kullanici> kullanicilar = new();
+    Dictionary<int, int> modelTakipSayilari = new();
     int secilenUrunId = 0;
     int atanacakUserId = 0;
     decimal yeniFiyat = 0;
@@ -449,6 +451,14 @@
             .ThenBy(u => u.Ad)
             .Take(100)
             .ToListAsync();
+
+        // UrunModeli başına aktif takipçi sayısı (kaç kullanıcı bu modeli takip ediyor)
+        var takipGruplari = await Db.TakipModelleri
+            .Where(t => t.Aktif)
+            .GroupBy(t => t.UrunModeliId)
+            .Select(g => new { ModelId = g.Key, Adet = g.Count() })
+            .ToListAsync();
+        modelTakipSayilari = takipGruplari.ToDictionary(x => x.ModelId, x => x.Adet);
 
         kullanicilar = await Db.Kullanicilar
             .Where(k => k.Aktif)

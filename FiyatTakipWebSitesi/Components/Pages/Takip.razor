@@ -73,6 +73,33 @@ else
             </div>
         }
 
+        @* ── Kategori Uyarı Modal'ı ── *@
+        @if (kategoriUyariGoster && bekleyenDetay is not null)
+        {
+            <div class="modal-arka" @onclick="UyariIptal">
+                <div class="modal-kart" @onclick:stopPropagation="true">
+                    <div class="modal-ikon">⚠️</div>
+                    <h3>Kategori Uyuşmazlığı</h3>
+                    <p class="modal-aciklama">
+                        "<strong>@bekleyenDetay.Ad</strong>" ürünü,
+                        seçili <strong>@secilenKategori</strong> kategorisi yerine
+                        <strong>@kategoriOnerilen</strong> kategorisine daha uygun görünüyor.
+                    </p>
+                    <div class="modal-btnler">
+                        <button class="modal-btn evet" @onclick="KategoriDuzeltVeKaydet">
+                            ✅ @kategoriOnerilen olarak ekle
+                        </button>
+                        <button class="modal-btn" style="background:#334155;color:#cbd5e1;" @onclick="UrunKaydet">
+                            Yine de @secilenKategori ekle
+                        </button>
+                        <button class="modal-btn hayir" @onclick="UyariIptal">
+                            ❌ İptal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
         @* ── URL EKLE — Kategori Seçimi Geri Geldi ──────────────────── *@
         <section class="ekle-kutu">
             <h3>🔗 URL ile Ekle</h3>
@@ -138,7 +165,17 @@ else
 
             @if (!string.IsNullOrEmpty(mesaj) && !yukleniyor)
             {
-                <p class="@(hataVar ? "mesaj-hata" : "mesaj-basari")">@mesaj</p>
+                <div class="@(hataVar ? "mesaj-hata" : "mesaj-basari")">
+                    @if (hataVar && zatenVarModelId > 0)
+                    {
+                        <span>⚠ Bu URL zaten takip listende. </span>
+                        <NavLink href="@($"/model/{zatenVarModelId}")" class="mesaj-link">Ürünü gör →</NavLink>
+                    }
+                    else
+                    {
+                        @mesaj
+                    }
+                </div>
             }
         </section>
 
@@ -367,6 +404,7 @@ else
 
     .mesaj-basari { color: #4ade80; background: rgba(74, 222, 128, 0.1); padding: 12px 16px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #16a34a; }
     .mesaj-hata { color: #fca5a5; background: rgba(239, 68, 68, 0.1); padding: 12px 16px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #dc2626; }
+    .mesaj-link { color: #38bdf8; font-weight: 700; text-decoration: underline; }
 
     .bos-kucuk {
         background: #252526; border: 1px dashed #4a4a4c;
@@ -581,6 +619,12 @@ else
     int birlestirHedefId = 0;
     bool birlestirIslemDevam = false;
 
+    bool kategoriUyariGoster = false;
+    string kategoriOnerilen = "";
+    UrunDetay? bekleyenDetay;
+    int bekleyenKatId;
+    int zatenVarModelId = 0;
+
     protected override async Task OnInitializedAsync()
     {
         Oturum.Degisti += StateHasChanged;
@@ -627,11 +671,30 @@ else
         }
 
         var uid0 = Oturum.KullaniciId!.Value;
-        var zatenVarUrl = await Db.Urunler.AnyAsync(u =>
-            u.URL == temizLink && u.UserId == uid0 && u.Aktif);
-        if (zatenVarUrl)
+        zatenVarModelId = 0;
+        var zatenVarUrun = await Db.Urunler
+            .FirstOrDefaultAsync(u => u.URL == temizLink && u.UserId == uid0 && u.Aktif);
+        if (zatenVarUrun is not null && zatenVarUrun.UrunModeliId.HasValue)
         {
-            mesaj = "⚠ Bu URL'yi zaten eklemişsin."; hataVar = true; return;
+            var modelId = zatenVarUrun.UrunModeliId.Value;
+            var aktifTakipVar = await Db.TakipModelleri.AnyAsync(t =>
+                t.UserId == uid0 && t.UrunModeliId == modelId && t.Aktif);
+
+            if (aktifTakipVar)
+            {
+                zatenVarModelId = modelId;
+                mesaj = "⚠ Bu URL zaten takip listende.";
+                hataVar = true;
+                return;
+            }
+
+            // Urun ekli ama takipte değil — sessizce yeniden takibe al, scrape gereksiz
+            await TakipModeliServisi.TakipEkleAsync(uid0, modelId);
+            await VerileriYukle();
+            yeniLink = "";
+            mesaj = $"✅ \"{zatenVarUrun.Ad}\" yeniden takibe alındı.";
+            hataVar = false;
+            return;
         }
 
         var siteAdi = ScraperService.SiteAdi(ScraperService.SiteTespit(temizLink));
@@ -659,13 +722,46 @@ else
             var detay = await scrapeGorev;
             foreach (var a in adimlar) a.Durum = AdimDurum.Tamamlandi;
             ilerleme = 100;
+            yukleniyor = false;
             StateHasChanged();
             await Task.Delay(400);
 
-            /* Kullanıcının seçtiği kategoriyi bul ve ID'sini çek */
             var kat = dbKategoriler.FirstOrDefault(k => k.Ad == secilenKategori) ?? dbKategoriler.FirstOrDefault();
-            var katId = kat?.Id ?? 1;
+            bekleyenDetay = detay;
+            bekleyenKatId = kat?.Id ?? 1;
 
+            // Kategori uyuşmazlığı kontrolü — uyuşmuyorsa modal göster, bekle
+            var onerilen = KategoriUyumsuzlugu(detay.Ad, secilenKategori);
+            if (onerilen is not null)
+            {
+                kategoriOnerilen = onerilen;
+                kategoriUyariGoster = true;
+                return;
+            }
+
+            await UrunKaydet();
+        }
+        catch (Exception ex)
+        {
+            mesaj = $"Hata: {ex.Message}";
+            hataVar = true;
+        }
+        finally
+        {
+            yukleniyor = false;
+        }
+    }
+
+    async Task UrunKaydet()
+    {
+        kategoriUyariGoster = false;
+        if (bekleyenDetay is null) return;
+
+        var detay = bekleyenDetay;
+        var katId = bekleyenKatId;
+
+        try
+        {
             var tumModeller = await Db.UrunModelleri.AsNoTracking().ToListAsync();
             var mevcutModel = tumModeller.FirstOrDefault(m =>
                 string.Equals(m.Ad.Trim(), detay.Ad.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -693,13 +789,18 @@ else
                 yeniModelOlustu = true;
             }
 
-            var zatenVar = await Db.Urunler.AnyAsync(u =>
-                u.URL == detay.Url && u.UserId == Oturum.KullaniciId && u.Aktif);
-
-            if (zatenVar)
+            // Yarış: UrunEkle ön kontrolünden sonra başka bir akış URL'yi eklemiş olabilir.
+            // Bu noktada aktif Urun varsa, sadece TakipModeli reaktive et ve çık.
+            var araVarUrun = await Db.Urunler
+                .FirstOrDefaultAsync(u => u.URL == detay.Url && u.UserId == Oturum.KullaniciId && u.Aktif);
+            if (araVarUrun is not null && araVarUrun.UrunModeliId.HasValue)
             {
-                mesaj = "⚠ Bu URL'yi zaten eklemişsin.";
-                hataVar = true;
+                await TakipModeliServisi.TakipEkleAsync(Oturum.KullaniciId!.Value, araVarUrun.UrunModeliId.Value);
+                await VerileriYukle();
+                yeniLink = "";
+                bekleyenDetay = null;
+                mesaj = $"✅ \"{araVarUrun.Ad}\" takip listene eklendi.";
+                hataVar = false;
                 return;
             }
 
@@ -714,7 +815,7 @@ else
                 ParaBirimi = "TRY",
                 KategoriId = katId,
                 UserId = Oturum.KullaniciId,
-                UrunModeliId = modelId,  
+                UrunModeliId = modelId,
             };
 
             await UrunServisi.EkleAsync(yeniUrun);
@@ -722,6 +823,7 @@ else
             await VerileriYukle();
 
             yeniLink = "";
+            bekleyenDetay = null;
             mesaj = yeniModelOlustu
                 ? $"✅ \"{detay.Ad}\" takip listene eklendi!"
                 : $"✅ \"{detay.Ad}\" takip listene eklendi (katalogdaki modele bağlandı)";
@@ -732,11 +834,82 @@ else
             mesaj = $"Hata: {ex.Message}";
             hataVar = true;
         }
-        finally
-        {
-            yukleniyor = false;
-        }
     }
+
+    async Task KategoriDuzeltVeKaydet()
+    {
+        var onerilen = dbKategoriler.FirstOrDefault(k => k.Ad == kategoriOnerilen);
+        if (onerilen is not null)
+        {
+            secilenKategori = onerilen.Ad;
+            bekleyenKatId = onerilen.Id;
+        }
+        await UrunKaydet();
+    }
+
+    void UyariIptal()
+    {
+        kategoriUyariGoster = false;
+        bekleyenDetay = null;
+        mesaj = "❌ Ekleme iptal edildi.";
+        hataVar = true;
+    }
+
+    static string? KategoriUyumsuzlugu(string urunAd, string secilenKat)
+    {
+        var adKucuk = urunAd.ToLowerInvariant();
+        string? enIyiKat = null;
+        int enYuksekPuan = 0;
+
+        foreach (var (kat, anahtarlar) in KategoriAnahtarlar)
+        {
+            var puan = anahtarlar.Count(a => adKucuk.Contains(a));
+            if (puan > enYuksekPuan)
+            {
+                enYuksekPuan = puan;
+                enIyiKat = kat;
+            }
+        }
+
+        if (enIyiKat is not null && enYuksekPuan > 0 &&
+            !string.Equals(enIyiKat, secilenKat, StringComparison.OrdinalIgnoreCase))
+            return enIyiKat;
+
+        return null;
+    }
+
+    static readonly Dictionary<string, string[]> KategoriAnahtarlar =
+        new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Elektronik"] = [
+            "telefon", "laptop", "bilgisayar", "tablet", "kulaklık", "klavye",
+            "mouse", "ekran", "monitör", "televizyon", "iphone", "samsung", "xiaomi",
+            "huawei", "şarj", "router", "modem", "yazıcı", "kamera", "drone",
+            "notebook", "işlemci", "grafik kartı", "akıllı saat", "bluetooth",
+            "airpod", "playstation", "xbox", "nintendo", "oyun konsol", "ssd", "ram",
+        ],
+        ["Ev & Yaşam"] = [
+            "buzdolabı", "çamaşır makinesi", "bulaşık makinesi", "fırın", "ocak",
+            "süpürge", "aspiratör", "çaydanlık", "kettle", "airfryer", "tencere",
+            "tava", "mutfak robotu", "blender", "mikser", "ütü", "klima",
+            "vantilatör", "halı", "perde", "nevresim", "koltuk",
+        ],
+        ["Moda"] = [
+            "ayakkabı", "terlik", "bot", "sandalet", "elbise", "gömlek", "pantolon",
+            "tişört", "kazak", "mont", "ceket", "çanta", "spor ayakkabı", "nike",
+            "adidas", "puma", "converse", "vans", "fila", "kemer", "hoodie",
+        ],
+        ["Kozmetik"] = [
+            "parfüm", "krem", "serum", "maskara", "ruj", "fondöten", "şampuan",
+            "saç boyası", "cilt bakım", "losyon", "deodorant", "nivea", "garnier",
+            "maybelline", "makyaj", "nemlendirici", "güneş kremi",
+        ],
+        ["Otomotiv"] = [
+            "motor yağı", "lastik", "jant", "akü", "fren", "yağ filtresi",
+            "hava filtresi", "silecek", "castrol", "koltuk kılıfı",
+            "araç aksesuarı", "araba aksesuar",
+        ],
+    };
 
     static decimal IsimBenzerlikSkoru(string a, string b)
     {

@@ -9,6 +9,7 @@
 @rendermode InteractiveServer
 @inject FiyatTakipWebSitesi.Services.KullaniciService KullaniciServisi
 @inject FiyatTakipWebSitesi.Services.OturumDurumu Oturum
+@inject FiyatTakipWebSitesi.Services.UyariService UyariServisi
 @inject FiyatTakipWebSitesi.Data.ApplicationDbContext Db
 @inject NavigationManager NavManager
 @inject ILogger<Hesap> Logger
@@ -32,9 +33,11 @@
                     <h3>@takipSayisi</h3>
                     <span>Takip Edilen</span>
                 </div>
-                <div class="box">
+                <div class="box @(bildirimSayisi > 0 ? "tiklanabilir" : "")"
+                     @onclick="TumUyarilariOkunduYap"
+                     title="@(bildirimSayisi > 0 ? "Tıklayınca hepsi okundu olur" : "")">
                     <h3>@bildirimSayisi</h3>
-                    <span>Okunmamış</span>
+                    <span>Okunmamış @(bildirimSayisi > 0 ? "(tıkla)" : "")</span>
                 </div>
             </div>
 
@@ -285,6 +288,13 @@
         border-radius: 12px;
         flex: 1;
         border: 1px solid #334155;
+        transition: all 0.2s;
+    }
+    .box.tiklanabilir { cursor: pointer; }
+    .box.tiklanabilir:hover {
+        border-color: #38bdf8;
+        background: #1e293b;
+        transform: translateY(-2px);
     }
     .box h3 {
         color: #60a5fa;
@@ -504,8 +514,17 @@
         if (kullanici is not null)
             emailBildirimAcik = kullanici.EmailBildirimleriniAc;
 
-        takipSayisi = await Db.Urunler.CountAsync(u => u.UserId == uid && u.Aktif);
+        takipSayisi = await Db.TakipModelleri.CountAsync(t => t.UserId == uid && t.Aktif);
         bildirimSayisi = await Db.Uyarilar.CountAsync(u => u.UserId == uid && !u.Okundu);
+    }
+
+    async Task TumUyarilariOkunduYap()
+    {
+        if (!Oturum.KullaniciId.HasValue || bildirimSayisi == 0) return;
+        await UyariServisi.TumunuOkunduIsaretle(Oturum.KullaniciId.Value);
+        bildirimSayisi = 0;
+        profilMesaji = "✅ Tüm bildirimler okundu işaretlendi.";
+        StateHasChanged();
     }
 
     async Task EmailToggleKaydet()
