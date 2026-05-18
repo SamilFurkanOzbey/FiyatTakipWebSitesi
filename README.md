@@ -46,20 +46,20 @@ Bu proje, Nesne Yönelimli Tasarım prensiplerine (Object-Oriented Design) sık�
 
 Proje, 3 kişilik bir ekip tarafından modüler bir iş bölümü ile geliştirilmiştir:
 
-1. **[Senin Adın Soyadın] — Frontend & UI/UX Developer**
+1. *Mehmet Ali Toros — Frontend & UI/UX Developer**
    - Blazor Server arayüz bileşenlerinin kodlanması.
    - Premium Karanlık Tema (Dark Mode) tasarımı ve entegrasyonu.
    - Kategori filtreleme, ürün listeleme ve "URL ile Ekle" modüllerinin ön yüz mantığı.
 
-2. **[Arkadaşının Adı Soyadı] — Backend & Data Engineer**
-   - Selenium WebDriver ile Web Scraping (Veri Kazıma) botlarının geliştirilmesi.
+2. *Ahmet Sevban Kurban — Backend & Security**
+   - JWT (JSON Web Token) tabanlı üyelik sisteminin yazılması.
    - Entity Framework Core ve SQLite veritabanı mimarisinin (Code-First) kurulması.
    - Hangfire ile arka plan (Background Job) görevlerinin yönetilmesi.
 
-3. **[Diğer Arkadaşının Adı Soyadı] — Core Services & Security**
-   - JWT (JSON Web Token) tabanlı üyelik sisteminin yazılması.
+3. *Şamil Furkan Özbey — Core Services & Data Engineer**
    - `IEmailService` üzerinden Polymorphic e-posta uyarı sisteminin entegrasyonu.
    - `GlobalExceptionHandler` ile hata yönetimi ve test süreçleri.
+   - Selenium WebDriver ile Web Scraping (Veri Kazıma) botlarının geliştirilmesi.
 
 ---
 
